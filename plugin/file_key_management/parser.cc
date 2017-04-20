@@ -330,7 +330,8 @@ char* Parser::read_and_decrypt_file(const char *secret)
   my_off_t file_size;
   file_size= lseek(f, 0, SEEK_END);
 
-  if (file_size == MY_FILEPOS_ERROR || lseek(f, 0, SEEK_SET) == MY_FILEPOS_ERROR)
+  if (file_size == MY_FILEPOS_ERROR ||
+      (my_off_t)lseek(f, 0, SEEK_SET) == MY_FILEPOS_ERROR)
   {
     my_error(EE_CANT_SEEK, MYF(0), filename, errno);
     goto err1;
