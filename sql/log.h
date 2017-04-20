@@ -21,7 +21,6 @@
 #include "wsrep.h"
 #include "wsrep_mysqld.h"
 #include "rpl_constants.h"
-#include <mysql/service_error_log.h> /* sql_print_information etc */
 
 class Relay_log_info;
 
@@ -1064,6 +1063,9 @@ int query_error_code(THD *thd, bool not_killed);
 uint purge_log_get_error_code(int res);
 
 int vprint_msg_to_log(enum loglevel level, const char *format, va_list args);
+void sql_print_error(const char *format, ...);
+void sql_print_warning(const char *format, ...);
+void sql_print_information(const char *format, ...);
 typedef void (*sql_print_message_func)(const char *format, ...);
 extern sql_print_message_func sql_print_message_handlers[];
 

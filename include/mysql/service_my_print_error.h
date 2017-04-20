@@ -27,29 +27,27 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 extern "C" {
 #endif
 
-#define ME_OLDWIN	2	/* Use old window */
-#define ME_BELL		4	/* Ring bell then printing message */
-#define ME_HOLDTANG	8	/* Don't delete last keys */
-#define ME_WAITTOT	16	/* Wait for errtime secs of for a action */
-#define ME_WAITTANG	32	/* Wait for a user action  */
-#define ME_NOREFRESH	64	/* Write the error message to error log */
-#define ME_NOINPUT	128	/* Dont use the input libary */
-#define ME_JUST_INFO    1024    /**< not error but just info */
-#define ME_JUST_WARNING 2048    /**< not error but just warning */
-#define ME_FATALERROR   4096    /* Fatal statement error */
+#ifndef MYSQL_ABI_CHECK
+#include <stdarg.h>
+#include <stdlib.h>
+#endif
 
+#define ME_ERROR_LOG    64      /* Write the message to the error log */
+#define ME_NOTE         1024    /* Not an error, just a note */
+#define ME_WARNING      2048    /* Not an error, just a warning */
+#define ME_FATAL        4096    /* Fatal statement error */
 
 extern struct my_print_error_service_st {
-  void(*my_error)(unsigned int nr, unsigned long MyFlags, ...);
-  void(*my_printf_error)(unsigned int nr, const char *fmt, unsigned long MyFlags,...);
-  void(*my_printv_error)(unsigned int error, const char *format, unsigned long MyFlags, va_list ap);
+  void (*my_error_func)(unsigned int nr, unsigned long MyFlags, ...);
+  void (*my_printf_error_func)(unsigned int nr, const char *fmt, unsigned long MyFlags,...);
+  void (*my_printv_error_func)(unsigned int error, const char *format, unsigned long MyFlags, va_list ap);
 } *my_print_error_service;
 
 #ifdef MYSQL_DYNAMIC_PLUGIN
 
-#define my_error my_print_error_service->my_error
-#define my_printf_error my_print_error_service->my_printf_error
-#define my_printv_error(A,B,C,D) my_print_error_service->my_printv_error(A,B,C,D)
+#define my_error my_print_error_service->my_error_func
+#define my_printf_error my_print_error_service->my_printf_error_func
+#define my_printv_error(A,B,C,D) my_print_error_service->my_printv_error_func(A,B,C,D)
 
 #else
 

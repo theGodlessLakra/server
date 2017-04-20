@@ -87,6 +87,7 @@ static void inline MYSQL_SERVER_my_error(...) {}
 
 #ifndef NO_ALARM
 #include "my_pthread.h"
+void sql_print_error(const char *format,...);
 #else
 #define DONT_USE_THR_ALARM
 #endif /* NO_ALARM */

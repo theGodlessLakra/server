@@ -22,7 +22,9 @@ SET(MYSQLSERVICES_SOURCES
   encryption_service.c
   kill_statement_service.c
   logger_service.c
+  my_crypt_service.c
   my_md5_service.c
+  my_print_error_service.c
   my_sha1_service.c
   my_sha2_service.c
   my_snprintf_service.c
@@ -35,10 +37,6 @@ SET(MYSQLSERVICES_SOURCES
   thd_timezone_service.c
   thd_wait_service.c
   wsrep_service.c
-  logger_service.c
-  my_crypt_service.c
-  my_print_error_service.c
-  error_log_service.c
   )
 
 ADD_CONVENIENCE_LIBRARY(mysqlservices ${MYSQLSERVICES_SOURCES})

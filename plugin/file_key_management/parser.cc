@@ -169,14 +169,14 @@ bool Parser::read_filekey(const char *filekey, char *secret)
   int f= open(filekey, O_RDONLY|O_BINARY);
   if (f == -1)
   {
-    my_error(EE_FILENOTFOUND,ME_NOREFRESH, filekey, errno);
+    my_error(EE_FILENOTFOUND,ME_ERROR_LOG, filekey, errno);
     return 1;
   }
 
   int len= read(f, secret, MAX_SECRET_SIZE);
   if (len <= 0)
   {
-    my_error(EE_READ,ME_NOREFRESH, filekey, errno);
+    my_error(EE_READ,ME_ERROR_LOG, filekey, errno);
     close(f);
     return 1;
   }
@@ -233,7 +233,7 @@ bool Parser::parse_file(std::map<uint,keyentry> *keys, const char *secret)
 void Parser::report_error(const char *reason, uint position)
 {
   my_printf_error(EE_READ, "%s at %s line %u, column %u",
-    MYF(ME_NOREFRESH), reason, filename, line_number, position + 1);
+    ME_ERROR_LOG, reason, filename, line_number, position + 1);
 }
 
 /*
@@ -316,14 +316,14 @@ char* Parser::read_and_decrypt_file(const char *secret)
   {
     my_printf_error(EE_CANT_OPEN_STREAM,
                     "file-key-management-filename is not set",
-                    MYF(ME_NOREFRESH));
+                    ME_ERROR_LOG);
     goto err0;
   }
 
   f= open(filename, O_RDONLY|O_BINARY, 0);
   if (f < 0)
   {
-    my_error(EE_FILENOTFOUND, ME_NOREFRESH, filename, errno);
+    my_error(EE_FILENOTFOUND, ME_ERROR_LOG, filename, errno);
     goto err0;
   }
 
@@ -348,15 +348,14 @@ char* Parser::read_and_decrypt_file(const char *secret)
   buffer= (uchar*)malloc((size_t)file_size + 1);
   if (!buffer)
   {
-    my_error(EE_OUTOFMEMORY, ME_NOREFRESH| ME_FATALERROR, file_size);
+    my_error(EE_OUTOFMEMORY, ME_ERROR_LOG | ME_FATAL, file_size);
     goto err1;
   }
 
   if (read(f, buffer, (int)file_size) != (int)file_size)
   {
-    my_printf_error(EE_READ,
-      "read from %s failed, errno %d",
-      MYF(ME_NOREFRESH|ME_FATALERROR), filename, errno);
+    my_printf_error(EE_READ, "read from %s failed, errno %d",
+      ME_ERROR_LOG | ME_FATAL, filename, errno);
     goto err2;
   }
 
@@ -370,7 +369,7 @@ char* Parser::read_and_decrypt_file(const char *secret)
     decrypted= (uchar*)malloc((size_t)file_size);
     if (!decrypted)
     {
-      my_error(EE_OUTOFMEMORY, ME_NOREFRESH | ME_FATALERROR, file_size);
+      my_error(EE_OUTOFMEMORY, ME_ERROR_LOG | ME_FATAL, file_size);
       goto err2;
     }
     bytes_to_key(buffer + OpenSSL_prefix_len, secret, key, iv);
@@ -382,7 +381,8 @@ char* Parser::read_and_decrypt_file(const char *secret)
                      iv, OpenSSL_iv_len))
 
     {
-      my_printf_error(EE_READ, "Cannot decrypt %s. Wrong key?", MYF(ME_NOREFRESH), filename);
+      my_printf_error(EE_READ, "Cannot decrypt %s. Wrong key?", ME_ERROR_LOG,
+                      filename);
       goto err3;
     }
 
@@ -392,7 +392,7 @@ char* Parser::read_and_decrypt_file(const char *secret)
   }
   else if (*secret)
   {
-    my_printf_error(EE_READ, "Cannot decrypt %s. Not encrypted", MYF(ME_NOREFRESH), filename);
+    my_printf_error(EE_READ, "Cannot decrypt %s. Not encrypted", ME_ERROR_LOG, filename);
     goto err2;
   }
 

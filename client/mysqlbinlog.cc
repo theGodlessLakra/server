@@ -1527,7 +1527,7 @@ static void error(const char *format,...)
   @param format Printf-style format string, followed by printf
   varargs.
 */
-void sql_print_error(const char *format,...)
+static void sql_print_error(const char *format,...)
 {
   va_list args;
   va_start(args, format);
