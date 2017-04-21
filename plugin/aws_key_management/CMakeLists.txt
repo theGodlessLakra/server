@@ -22,7 +22,7 @@ MACRO(SKIP_AWS_PLUGIN msg)
 ENDMACRO()
 
 MYSQL_ADD_PLUGIN(aws_key_management aws_key_management_plugin.cc DISABLED
-                 COMPONENT aws-key-management PURE)
+                 COMPONENT aws-key-management)
 
 IF(NOT TARGET aws_key_management)
   RETURN()
