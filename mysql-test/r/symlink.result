@@ -179,8 +179,8 @@ SET @@SQL_MODE=@OLD_SQL_MODE;
 # BUG#40980 - Drop table can remove another MyISAM table's
 #             data and index files
 #
-CREATE TABLE user(a INT) DATA DIRECTORY='MYSQLTEST_VARDIR/mysql'
-                             INDEX DIRECTORY='MYSQLTEST_VARDIR/mysql';
+CREATE TABLE user(a INT) DATA DIRECTORY='MYSQL_TMP_DIR/mysql'
+                             INDEX DIRECTORY='MYSQL_TMP_DIR/mysql';
 FLUSH TABLE user;
 # Symlinking mysql database to tmpdir
 FLUSH TABLE mysql.user;

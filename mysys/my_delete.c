@@ -103,11 +103,6 @@ static int my_win_unlink(const char *name)
     DBUG_RETURN(-1);
   }
 
-  if (attributes & FILE_ATTRIBUTE_READONLY)
-  {
-    SetFileAttributes(name, attributes & ~FILE_ATTRIBUTE_READONLY);
-  }
-
   if (attributes & FILE_ATTRIBUTE_REPARSE_POINT)
   {
     /* Symbolic link. Delete link, the not target */

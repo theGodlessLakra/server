@@ -258,23 +258,23 @@ SET @@SQL_MODE=@OLD_SQL_MODE;
 --echo # BUG#40980 - Drop table can remove another MyISAM table's
 --echo #             data and index files
 --echo #
---mkdir $MYSQLTEST_VARDIR/mysql
---replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
-eval CREATE TABLE user(a INT) DATA DIRECTORY='$MYSQLTEST_VARDIR/mysql'
-                             INDEX DIRECTORY='$MYSQLTEST_VARDIR/mysql';
+--mkdir $MYSQL_TMP_DIR/mysql 
+--replace_result $MYSQL_TMP_DIR MYSQL_TMP_DIR
+eval CREATE TABLE user(a INT) DATA DIRECTORY='$MYSQL_TMP_DIR/mysql'
+                             INDEX DIRECTORY='$MYSQL_TMP_DIR/mysql';
 FLUSH TABLE user;
 --echo # Symlinking mysql database to tmpdir
---remove_file $MYSQLTEST_VARDIR/mysql/user.MYD
---remove_file $MYSQLTEST_VARDIR/mysql/user.MYI
---rmdir $MYSQLTEST_VARDIR/mysql
---exec ln -s $MYSQLD_DATADIR/mysql $MYSQLTEST_VARDIR/mysql
+--remove_file $MYSQL_TMP_DIR/mysql/user.MYD
+--remove_file $MYSQL_TMP_DIR/mysql/user.MYI
+--rmdir $MYSQL_TMP_DIR/mysql
+--exec ln -s $MYSQLD_DATADIR/mysql $MYSQL_TMP_DIR/mysql
 FLUSH TABLE mysql.user;
 DROP TABLE user;
 FLUSH TABLE mysql.user;
 --disable_result_log
 SELECT * FROM mysql.user;
 --enable_result_log
---remove_file $MYSQLTEST_VARDIR/mysql
+--remove_file $MYSQL_TMP_DIR/mysql
 
 --echo End of 5.1 tests
 
