@@ -14,8 +14,8 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
 
 
-OPTION(WITH_XTRABACKUP "Include xtrabackup" ON)
-IF(NOT WITH_XTRABACKUP)
+OPTION(WITH_MARIABACKUP "Include mariabackup" ON)
+IF(NOT WITH_MARIABACKUP)
   RETURN()
 ENDIF()
 
@@ -166,6 +166,8 @@ MYSQL_ADD_EXECUTABLE(mariabackup
   backup_copy.cc
   encryption_plugin.cc
   ${PROJECT_SOURCE_DIR}/libmysql/libmysql.c
+  ${PROJECT_SOURCE_DIR}/sql/net_serv.cc
+  ${PROJECT_SOURCE_DIR}/sql/nt_servc.cc
   COMPONENT backup
   )
 
