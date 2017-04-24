@@ -1,6 +1,6 @@
 if (`SELECT COUNT(*)=0 FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME = 'aws_key_management' AND PLUGIN_STATUS='ACTIVE'`)
 {
-  --skip Test requires aws_key_management plugin
+  --skip needs aws_key_management plugin plugin
 }
 
 if (`SELECT @@aws_key_management_master_key_id=''`)

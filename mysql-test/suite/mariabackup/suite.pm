@@ -30,21 +30,9 @@ $ENV{INNOBACKUPEX}= "$mariabackup_exe --innobackupex";
 
 sub skip_combinations {
   my %skip;
-  
-  my $t;
-  foreach $t ('xb_file_key_management','xb_compressed_encrypted','xb_fulltext_encrypted') {
-    $skip{$t.'.test'} = 'Test needs file_key_management plugin'  unless $ENV{FILE_KEY_MANAGEMENT_SO};
-  }
-  foreach $t ('incremental_encrypted') {
-    $skip{$t.'.test'} = 'Test needs example_key_management plugin'  unless $ENV{EXAMPLE_KEY_MANAGEMENT_SO};
-  }
-  foreach $t ('xb_aws_key_management') {
-    $skip{$t.'.test'} = 'Test needs aws_key_management plugin'  unless $ENV{AWS_KEY_MANAGEMENT_SO};
-  }
+  $skip{'include/have_file_key_management.inc'} = 'needs file_key_management plugin'  unless $ENV{FILE_KEY_MANAGEMENT_SO};
   %skip;
 }
-
-sub is_default { 1 }
 
 bless { };
 

@@ -1,6 +1,6 @@
 if (!$EXAMPLE_KEY_MANAGEMENT_SO)
 {
-  --skip Needs example_key_management
+  --skip needs example_key_management plugin
 }
 call mtr.add_suppression("InnoDB: New log files created");
 
