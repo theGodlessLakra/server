@@ -1,0 +1,36 @@
+--source include/have_innodb.inc
+
+let $typec= BLOB COMPRESSED;
+let $typeu= BLOB;
+--source column_compression.inc
+
+let $typec= TEXT COMPRESSED;
+let $typeu= TEXT;
+--source column_compression.inc
+
+let $typec= VARBINARY(10000) COMPRESSED;
+let $typeu= VARBINARY(10000);
+--source column_compression.inc
+
+let $typec= VARCHAR(10000) COMPRESSED;
+let $typeu= VARCHAR(10000);
+--source column_compression.inc
+
+SET column_compression_zlib_wrap=false;
+let $typec= BLOB COMPRESSED;
+let $typeu= BLOB;
+--source column_compression.inc
+SET column_compression_zlib_wrap=DEFAULT;
+
+--error ER_WRONG_FIELD_SPEC
+CREATE TABLE t1(a CHAR(100) COMPRESSED);
+--error ER_WRONG_FIELD_SPEC
+CREATE TABLE t1(a INT COMPRESSED);
+--error ER_WRONG_FIELD_SPEC
+CREATE TABLE t1(a BLOB COMPRESSED=unknown);
+--error ER_WRONG_FIELD_SPEC
+CREATE TABLE t1(a BLOB COMPRESSED COMPRESSED);
+CREATE TABLE t1(a INT);
+--error ER_WRONG_FIELD_SPEC
+ALTER TABLE t1 MODIFY a INT COMPRESSED;
+DROP TABLE t1;

@@ -4762,7 +4762,9 @@ row_merge_build_indexes(
 	}
 
 	/* Reset the MySQL row buffer that is used when reporting
-	duplicate keys. */
+	duplicate keys.
+
+	This is likely reason for a problem described in MDEV-12586. */
 	innobase_rec_reset(table);
 
 	sql_print_information("InnoDB: Online DDL : Start");

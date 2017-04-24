@@ -706,6 +706,11 @@ typedef struct system_variables
   uint idle_transaction_timeout;
   uint idle_readonly_transaction_timeout;
   uint idle_readwrite_transaction_timeout;
+
+  uint column_compression_threshold;
+  uint column_compression_zlib_level;
+  ulong column_compression_zlib_strategy;
+  my_bool column_compression_zlib_wrap;
 } SV;
 
 /**
@@ -716,6 +721,9 @@ typedef struct system_variables
 
 typedef struct system_status_var
 {
+  ulong column_compressions;
+  ulong column_decompressions;
+
   ulong com_stat[(uint) SQLCOM_END];
   ulong com_create_tmp_table;
   ulong com_drop_tmp_table;

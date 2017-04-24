@@ -930,6 +930,7 @@ static bool make_empty_rec(THD *thd, uchar *buff, uint table_options,
   /* We need a table to generate columns for default values */
   bzero((char*) &table, sizeof(table));
   bzero((char*) &share, sizeof(share));
+  share.mysql_version= MYSQL_VERSION_ID;
   table.s= &share;
 
   table.in_use= thd;

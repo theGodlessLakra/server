@@ -3717,6 +3717,14 @@ mysql_prepare_create_table(THD *thd, HA_CREATE_INFO *create_info,
 	  DBUG_RETURN(TRUE);
 	}
       }
+
+      if (sql_field->compression_algorithm())
+      {
+        my_error(ER_COMPRESSED_COLUMN_USED_AS_KEY, MYF(0),
+                 column->field_name.str);
+        DBUG_RETURN(TRUE);
+      }
+
       cols2.rewind();
       if (key->type == Key::FULLTEXT)
       {

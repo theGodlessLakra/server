@@ -1634,7 +1634,7 @@ bool my_yyoverflow(short **a, YYSTYPE **b, ulong *yystacksize);
         field_length opt_field_length opt_field_length_default_1
 
 %type <const_simple_string>
-        opt_place
+        opt_place opt_compression_algorithm
 
 %type <string>
         text_string hex_or_bin_String opt_gconcat_separator
@@ -6546,7 +6546,18 @@ attribute:
                                 $2->name,Lex->charset->csname));
             Lex->last_field->charset= $2;
           }
+        | COMPRESSED_SYM opt_compression_algorithm
+          {
+            if (Lex->last_field->set_compressed($2))
+              my_yyabort_error((ER_WRONG_FIELD_SPEC, MYF(0),
+                               Lex->last_field->field_name));
+          }
         | serial_attribute
+        ;
+
+opt_compression_algorithm:
+          /* empty */ { $$= NULL; }
+        | equal ident { $$= $2.str; }
         ;
 
 serial_attribute:

@@ -717,6 +717,12 @@ ha_innobase::check_if_supported_inplace_alter(
 
 			DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 		}
+
+		/* Disable online ALTER TABLE for compressed columns
+		until MDEV-12586 is fixed. */
+		if (field->compression_algorithm()) {
+			DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
+		}
 	}
 
 	/* If we have column that has changed from NULL -> NOT NULL
@@ -744,6 +750,18 @@ ha_innobase::check_if_supported_inplace_alter(
 					DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 				}
 				break;
+			}
+		}
+	}
+
+	/* Disable online ALTER TABLE for compressed columns
+	until MDEV-12586 is fixed. */
+	{
+		List_iterator<Create_field> def_it(ha_alter_info->alter_info->create_list);
+		Create_field *def;
+		while ((def=def_it++)) {
+			if (def->compression_algorithm()) {
+				DBUG_RETURN(HA_ALTER_INPLACE_NOT_SUPPORTED);
 			}
 		}
 	}
