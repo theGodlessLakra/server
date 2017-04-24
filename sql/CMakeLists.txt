@@ -76,12 +76,6 @@ IF(SSL_DEFINES)
  ADD_DEFINITIONS(${SSL_DEFINES})
 ENDIF()
 
-IF(WIN32)
-  SET(NT_SERVICE_SOURCES nt_servc.cc nt_servc.h )
-ELSE()
-  SET(NT_SERVICE_SOURCES)
-ENDIF()
-
 SET (SQL_SOURCE
               ../sql-common/client.c compat56.cc derror.cc des_key_file.cc
                discover.cc ../libmysql/errmsg.c field.cc  field_conv.cc 
@@ -148,7 +142,6 @@ SET (SQL_SOURCE
                ${GEN_SOURCES}
                ${GEN_DIGEST_SOURCES}
                ${MYSYS_LIBWRAP_SOURCE}
-               ${NT_SERVICE_SOURCES}
 			   )
   
 IF (CMAKE_SYSTEM_NAME MATCHES "Linux" OR
@@ -178,7 +171,7 @@ TARGET_LINK_LIBRARIES(sql ${MYSQLD_STATIC_PLUGIN_LIBS}
   ${LIBSYSTEMD})
 
 IF(WIN32)
-  SET(MYSQLD_SOURCE main.cc message.rc)
+  SET(MYSQLD_SOURCE main.cc nt_servc.cc message.rc)
   TARGET_LINK_LIBRARIES(sql psapi)
 ELSE()
   SET(MYSQLD_SOURCE main.cc ${DTRACE_PROBES_ALL})
