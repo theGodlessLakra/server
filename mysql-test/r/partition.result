@@ -2561,8 +2561,8 @@ PARTITION BY KEY (id) PARTITIONS 5;
 # Insert some rows 
 select * from t1 where hours_worked_per_week = 40 and weeks_worked_last_year = 52 and dob < '1949-11-21';
 id	id2	dob	address	city	hours_worked_per_week	weeks_worked_last_year
-16	16	1949-11-07	address16	city16	40	52
 50	50	1923-09-08	address50	city50	40	52
+16	16	1949-11-07	address16	city16	40	52
 select * from t1 IGNORE INDEX(dob, weeks_worked_last_year, hours_worked_per_week) where hours_worked_per_week = 40 and weeks_worked_last_year = 52 and dob < '1949-11-21';
 id	id2	dob	address	city	hours_worked_per_week	weeks_worked_last_year
 16	16	1949-11-07	address16	city16	40	52
