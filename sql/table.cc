@@ -695,7 +695,7 @@ static bool create_key_infos(const uchar *strpos, const uchar *frm_image_end,
   KEY_PART_INFO *key_part= NULL;
   ulong *rec_per_key= NULL;
   KEY_PART_INFO *first_key_part= NULL;
-  uint first_key_parts= 0;
+  uint first_key_parts= 0,pk_length=0,ext_key_length=0;
 
   if (!keys)
   {  
@@ -765,6 +765,7 @@ static bool create_key_infos(const uchar *strpos, const uchar *frm_image_end,
       keyinfo->algorithm= first_keyinfo->algorithm;
       if (new_frm_ver >= 3)
         keyinfo->block_size= first_keyinfo->block_size;
+      pk_length= keyinfo->key_length;
     }
 
     keyinfo->key_part=	 key_part;
@@ -796,6 +797,7 @@ static bool create_key_infos(const uchar *strpos, const uchar *frm_image_end,
 	strpos+=7;
       }
       key_part->store_length=key_part->length;
+      ext_key_length+= key_part->length;
     }
 
     /*
@@ -805,7 +807,8 @@ static bool create_key_infos(const uchar *strpos, const uchar *frm_image_end,
     keyinfo->ext_key_parts= keyinfo->user_defined_key_parts;
     keyinfo->ext_key_flags= keyinfo->flags;
     keyinfo->ext_key_part_map= 0;
-    if (share->use_ext_keys && i && !(keyinfo->flags & HA_NOSAME))
+    if (share->use_ext_keys && i && !(keyinfo->flags & HA_NOSAME)
+                         && (pk_length + ext_key_length <= MAX_KEY_LENGTH))
     {
       for (j= 0; 
            j < first_key_parts && keyinfo->ext_key_parts < MAX_REF_PARTS;
