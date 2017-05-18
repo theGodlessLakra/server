@@ -1044,7 +1044,6 @@ fil_space_verify_crypt_checksum(
 		checksum2 = mach_read_from_4(
 			page + UNIV_PAGE_SIZE - FIL_PAGE_END_LSN_OLD_CHKSUM);
 		valid = (buf_page_is_checksum_valid_crc32(page,checksum1,checksum2)
-		|| buf_page_is_checksum_valid_none(page,checksum1,checksum2)
 		|| buf_page_is_checksum_valid_innodb(page,checksum1, checksum2));
 	}
 
