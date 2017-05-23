@@ -100,6 +100,7 @@ FLUSH LOGS;
 
 let $MYSQLD_DATADIR= `select @@datadir`;
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--exec $MYSQL_BINLOG -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_original_1.sql
 --exec $MYSQL_BINLOG -B -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_1.sql
 --exec $MYSQL -e "SET binlog_format= ROW; source $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_1.sql;"
 
@@ -123,6 +124,7 @@ FLUSH LOGS;
 
 let $MYSQLD_DATADIR= `select @@datadir`;
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--exec $MYSQL_BINLOG -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_original_2.sql
 --exec $MYSQL_BINLOG -B -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_2.sql
 --exec $MYSQL -e "SET binlog_format= ROW; source $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_2.sql;"
 
@@ -155,13 +157,101 @@ FLUSH LOGS;
 
 let $MYSQLD_DATADIR= `select @@datadir`;
 --replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--exec $MYSQL_BINLOG -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_original_3.sql
 --exec $MYSQL_BINLOG -B -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_3.sql
 --exec $MYSQL -e "SET binlog_format= ROW; source $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_3.sql;"
 
 SELECT * FROM t1;
 
+DROP TABLE t1;
+
+--echo #
+--echo # Trigger
+--echo #
+CREATE TABLE t1 (a INT PRIMARY KEY, b INT) ENGINE=InnoDB;
+CREATE TABLE t2 (a INT PRIMARY KEY, b INT) ENGINE=InnoDB;
+
+BEGIN;
+INSERT INTO t1 VALUES (1, NULL);
+INSERT INTO t1 VALUES (2, 1), (3, 2), (4, 3);
+INSERT INTO t2 VALUES (6, 7), (7, 8), (8, 9);
+COMMIT;
+
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+CREATE TRIGGER trg1 BEFORE INSERT ON t1 FOR EACH ROW DELETE FROM t2 WHERE a = NEW.b;
+
+# New binlog
+RESET MASTER;
+
+INSERT INTO t1 VALUES (5, 6), (7, 8);
+
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+FLUSH LOGS;
+
+--echo #
+--echo # Flashback & Check the result
+--echo #
+
+let $MYSQLD_DATADIR= `select @@datadir`;
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--exec $MYSQL_BINLOG -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_original_4.sql
+--exec $MYSQL_BINLOG -B $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_4.sql
+--exec $MYSQL -e "SET binlog_format= ROW; source $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_4.sql;"
+
+SELECT * FROM t1;
+SELECT * FROM t2;
+
+DROP TRIGGER trg1;
+DROP TABLE t1;
+DROP TABLE t2;
+
+--echo #
+--echo # REPLCAE Queries
+--echo #
+CREATE TABLE t1 (a INT PRIMARY KEY, b INT, UNIQUE uk(b)) ENGINE=InnoDB;
+
+BEGIN;
+INSERT INTO t1 VALUES (1, NULL);
+INSERT INTO t1 VALUES (2, 1), (3, 2), (4, 3);
+INSERT INTO t1 VALUES (5, 4), (6, 5), (7, 6);
+COMMIT;
+
+SELECT * FROM t1;
+
+# New binlog
+RESET MASTER;
+
+REPLACE INTO t1 VALUES (3, 100);
+REPLACE INTO t1 SET a=4, b=200;
+
+SELECT * FROM t1;
+
+REPLACE INTO t1 VALUES (5,5);
+
+SELECT * FROM t1;
+
+FLUSH LOGS;
+
+--echo #
+--echo # Flashback & Check the result
+--echo #
+
+let $MYSQLD_DATADIR= `select @@datadir`;
+--replace_result $MYSQLTEST_VARDIR MYSQLTEST_VARDIR
+--exec $MYSQL_BINLOG -vv $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_original_5.sql
+--exec $MYSQL_BINLOG -B $MYSQLD_DATADIR/master-bin.000001 > $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_5.sql
+--exec $MYSQL -e "SET binlog_format= ROW; source $MYSQLTEST_VARDIR/tmp/mysqlbinlog_row_flashback_5.sql;"
+
+SELECT * FROM t1;
+
+DROP TABLE t1;
+
+## Clear
+
 SET binlog_format=statement;
 --error ER_FLASHBACK_NOT_SUPPORTED
 SET GLOBAL binlog_format=statement;
-
-DROP TABLE t1;
