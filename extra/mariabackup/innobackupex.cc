@@ -45,7 +45,6 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include <mysql.h>
 #include <my_dir.h>
 #include <ut0mem.h>
-#include <os0sync.h>
 #include <os0file.h>
 #include <srv0start.h>
 #include <algorithm>

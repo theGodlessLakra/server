@@ -63,7 +63,7 @@ xb_get_relative_path(
 	prev = NULL;
 	cur = path;
 
-	while ((next = strchr(cur, SRV_PATH_SEPARATOR)) != NULL) {
+	while ((next = strchr(cur, OS_PATH_SEPARATOR)) != NULL) {
 
 		prev = cur;
 		cur = next + 1;
@@ -96,7 +96,7 @@ xb_fil_node_close_file(
 	ut_a(node->n_pending_flushes == 0);
 	ut_a(!node->being_extended);
 
-	if (!node->open) {
+	if (!node->is_open()) {
 
 		mutex_exit(&fil_system->mutex);
 
@@ -106,19 +106,19 @@ xb_fil_node_close_file(
 	ret = os_file_close(node->handle);
 	ut_a(ret);
 
-	node->open = FALSE;
+  node->handle = OS_FILE_CLOSED;
 
 	ut_a(fil_system->n_open > 0);
 	fil_system->n_open--;
 	fil_n_file_opened--;
 
-	if (node->space->purpose == FIL_TABLESPACE &&
+	if (node->space->purpose == FIL_TYPE_TABLESPACE &&
 	    fil_is_user_tablespace_id(node->space->id)) {
 
 		ut_a(UT_LIST_GET_LEN(fil_system->LRU) > 0);
 
 		/* The node is in the LRU list, remove it */
-		UT_LIST_REMOVE(LRU, fil_system->LRU, node);
+		UT_LIST_REMOVE(fil_system->LRU, node);
 	}
 
 	mutex_exit(&fil_system->mutex);
@@ -181,22 +181,20 @@ xb_fil_cur_open(
 		}
 		mutex_enter(&fil_system->mutex);
 
-		node->open = TRUE;
-
 		fil_system->n_open++;
 		fil_n_file_opened++;
 
-		if (node->space->purpose == FIL_TABLESPACE &&
+		if (node->space->purpose == FIL_TYPE_TABLESPACE &&
 		    fil_is_user_tablespace_id(node->space->id)) {
 
 			/* Put the node to the LRU list */
-			UT_LIST_ADD_FIRST(LRU, fil_system->LRU, node);
+			UT_LIST_ADD_FIRST(fil_system->LRU, node);
 		}
 
 		mutex_exit(&fil_system->mutex);
 	}
 
-	ut_ad(node->open);
+	ut_ad(node->is_open());
 
 	cursor->node = node;
 	cursor->file = node->handle;
@@ -210,8 +208,8 @@ xb_fil_cur_open(
 		return(XB_FIL_CUR_ERROR);
 	}
 
-	if (srv_unix_file_flush_method == SRV_UNIX_O_DIRECT
-	    || srv_unix_file_flush_method == SRV_UNIX_O_DIRECT_NO_FSYNC) {
+	if (srv_file_flush_method == SRV_O_DIRECT
+	    || srv_file_flush_method == SRV_O_DIRECT_NO_FSYNC) {
 
 		os_file_set_nocache(cursor->file, node->name, "OPEN");
 	}
@@ -244,7 +242,7 @@ xb_fil_cur_open(
 	/* Allocate read buffer */
 	cursor->buf_size = XB_FIL_CUR_PAGES * page_size;
 	cursor->orig_buf = static_cast<byte *>
-		(ut_malloc(cursor->buf_size + UNIV_PAGE_SIZE));
+		(malloc(cursor->buf_size + UNIV_PAGE_SIZE));
 	cursor->buf = static_cast<byte *>
 		(ut_align(cursor->orig_buf, UNIV_PAGE_SIZE));
 
@@ -330,7 +328,7 @@ read_retry:
 	cursor->buf_offset = offset;
 	cursor->buf_page_no = (ulint)(offset >> cursor->page_size_shift);
 
-	success = os_file_read(cursor->file, cursor->buf, offset,
+	success = os_file_read(IORequest(IORequest::READ),cursor->file, cursor->buf, offset,
 			       (ulint)to_read);
 	if (!success) {
 		return(XB_FIL_CUR_ERROR);

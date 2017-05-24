@@ -54,7 +54,10 @@ Place, Suite 330, Boston, MA 02111-1307 USA
 #include "mysqld.h"
 #include "encryption_plugin.h"
 #include <sstream>
+#include <sql_error.h>
+#include <ha_xtradb.h>
 
+using namespace std;
 
 char *tool_name;
 char tool_args[2048];
@@ -850,9 +853,9 @@ static
 void
 start_query_killer()
 {
-	kill_query_thread_stop		= os_event_create();
-	kill_query_thread_started	= os_event_create();
-	kill_query_thread_stopped	= os_event_create();
+	kill_query_thread_stop		= os_event_create("kill_query_thread_stop");
+	kill_query_thread_started	= os_event_create("kill_query_thread_started");
+	kill_query_thread_stopped	= os_event_create("kill_query_thread_stopped");
 
 	os_thread_create(kill_query_thread, NULL, &kill_query_thread_id);
 
@@ -1368,17 +1371,17 @@ cleanup:
 	return(result);
 }
 
-static string escape_and_quote(MYSQL *mysql,const char *str)
+static std::string escape_and_quote(MYSQL *mysql,const char *str)
 {
 	if (!str)
-		return "NULL";
+		return std::string("NULL");
 	size_t len = strlen(str);
 	char* escaped = (char *)alloca(2 * len + 3);
 	escaped[0] = '\'';
 	size_t new_len = mysql_real_escape_string(mysql, escaped+1, str, len);
 	escaped[new_len + 1] = '\'';
 	escaped[new_len + 2] = 0;
-	return string(escaped);
+	return std::string(escaped);
 }
 
 /*********************************************************************//**
@@ -1553,7 +1556,7 @@ bool write_backup_config_file()
 		srv_n_log_files,
 		innobase_log_file_size,
 		srv_page_size,
-		srv_log_block_size,
+		srv_log_write_ahead_size,
 		srv_undo_dir,
 		srv_undo_tablespaces,
 		innobase_doublewrite_file ? "innodb_doublewrite_file=" : "",

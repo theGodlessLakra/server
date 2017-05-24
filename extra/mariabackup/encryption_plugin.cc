@@ -8,6 +8,9 @@
 #include <vector>
 #include <common.h>
 #include <backup_mysql.h>
+#include <log0crypt.h>
+using namespace std;
+
 
 
 extern struct st_maria_plugin *mysql_optional_plugins[];

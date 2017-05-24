@@ -89,7 +89,7 @@ struct datadir_iter_t {
 	ulint		filepath_len;
 	char		*filepath_rel;
 	ulint		filepath_rel_len;
-	os_ib_mutex_t	mutex;
+ pthread_mutex_t	mutex;
 	os_file_dir_t	dir;
 	os_file_dir_t	dbdir;
 	os_file_stat_t	dbinfo;
@@ -107,7 +107,7 @@ struct datadir_thread_ctxt_t {
 	datadir_iter_t		*it;
 	uint			n_thread;
 	uint			*count;
-	os_ib_mutex_t		count_mutex;
+	pthread_mutex_t		count_mutex;
 	os_thread_id_t		id;
 	bool			ret;
 };
@@ -134,12 +134,12 @@ datadir_node_fill(datadir_node_t *node, datadir_iter_t *it)
 {
 	if (node->filepath_len < it->filepath_len) {
 		free(node->filepath);
-		node->filepath = (char*)(ut_malloc(it->filepath_len));
+		node->filepath = (char*)(malloc(it->filepath_len));
 		node->filepath_len = it->filepath_len;
 	}
 	if (node->filepath_rel_len < it->filepath_rel_len) {
 		free(node->filepath_rel);
-		node->filepath_rel = (char*)(ut_malloc(it->filepath_rel_len));
+		node->filepath_rel = (char*)(malloc(it->filepath_rel_len));
 		node->filepath_rel_len = it->filepath_rel_len;
 	}
 
@@ -178,10 +178,10 @@ datadir_iter_new(const char *path, bool skip_first_level = true)
 {
 	datadir_iter_t *it;
 
-	it = static_cast<datadir_iter_t *>(ut_malloc(sizeof(datadir_iter_t)));
+	it = static_cast<datadir_iter_t *>(malloc(sizeof(datadir_iter_t)));
 	memset(it, 0, sizeof(datadir_iter_t));
 
-	it->mutex = os_mutex_create();
+	pthread_mutex_init(&it->mutex, NULL);
 	it->datadir_path = strdup(path);
 
 	it->dir = os_file_opendir(it->datadir_path, TRUE);
@@ -194,13 +194,13 @@ datadir_iter_new(const char *path, bool skip_first_level = true)
 	it->err = DB_SUCCESS;
 
 	it->dbpath_len = FN_REFLEN;
-	it->dbpath = static_cast<char*>(ut_malloc(it->dbpath_len));
+	it->dbpath = static_cast<char*>(malloc(it->dbpath_len));
 
 	it->filepath_len = FN_REFLEN;
-	it->filepath = static_cast<char*>(ut_malloc(it->filepath_len));
+	it->filepath = static_cast<char*>(malloc(it->filepath_len));
 
 	it->filepath_rel_len = FN_REFLEN;
-	it->filepath_rel = static_cast<char*>(ut_malloc(it->filepath_rel_len));
+	it->filepath_rel = static_cast<char*>(malloc(it->filepath_rel_len));
 
 	it->skip_first_level = skip_first_level;
 
@@ -253,12 +253,12 @@ datadir_iter_next_database(datadir_iter_t *it)
 			}
 
 			it->dbpath = static_cast<char*>
-					(ut_malloc(it->dbpath_len));
+					(malloc(it->dbpath_len));
 		}
 		ut_snprintf(it->dbpath, it->dbpath_len,
 			    "%s/%s", it->datadir_path,
 			    it->dbinfo.name);
-		srv_normalize_path_for_win(it->dbpath);
+		os_normalize_path(it->dbpath);
 
 		if (it->dbinfo.type == OS_FILE_TYPE_FILE) {
 			it->is_file = true;
@@ -307,7 +307,7 @@ make_path_n(int n, char **path, ulint *path_len, ...)
 
 	if (len_needed < *path_len) {
 		ut_free(*path);
-		*path = static_cast<char*>(ut_malloc(len_needed));
+		*path = static_cast<char*>(malloc(len_needed));
 	}
 
 	va_start(vl, path_len);
@@ -378,7 +378,7 @@ datadir_iter_next(datadir_iter_t *it, datadir_node_t *node)
 {
 	bool	ret = true;
 
-	os_mutex_enter(it->mutex);
+	pthread_mutex_lock(&it->mutex);
 
 	if (datadir_iter_next_file(it)) {
 
@@ -413,7 +413,7 @@ datadir_iter_next(datadir_iter_t *it, datadir_node_t *node)
 	ret = false;
 
 done:
-	os_mutex_exit(it->mutex);
+	pthread_mutex_unlock(&it->mutex);
 
 	return(ret);
 }
@@ -427,7 +427,7 @@ static
 void
 datadir_iter_free(datadir_iter_t *it)
 {
-	os_mutex_free(it->mutex);
+	pthread_mutex_destroy(&it->mutex);
 
 	if (it->dbdir) {
 
@@ -518,7 +518,7 @@ datafile_open(const char *file, datafile_cur_t *cursor, uint thread_n)
 	posix_fadvise(cursor->file, 0, 0, POSIX_FADV_SEQUENTIAL);
 
 	cursor->buf_size = 10 * 1024 * 1024;
-	cursor->buf = static_cast<byte *>(ut_malloc((ulint)cursor->buf_size));
+	cursor->buf = static_cast<byte *>(malloc((ulint)cursor->buf_size));
 
 	return(true);
 }
@@ -540,7 +540,7 @@ datafile_read(datafile_cur_t *cursor)
 		return(XB_FIL_CUR_EOF);
 	}
 
-	success = os_file_read(cursor->file, cursor->buf, cursor->buf_offset,
+	success = os_file_read(IORequest(IORequest::READ),cursor->file, cursor->buf, cursor->buf_offset,
 			       to_read);
 	if (!success) {
 		return(XB_FIL_CUR_ERROR);
@@ -917,13 +917,13 @@ run_data_threads(datadir_iter_t *it, os_thread_func_t func, uint n)
 {
 	datadir_thread_ctxt_t	*data_threads;
 	uint			i, count;
-	os_ib_mutex_t		count_mutex;
+	pthread_mutex_t		count_mutex;
 	bool			ret;
 
 	data_threads = (datadir_thread_ctxt_t*)
-				(ut_malloc(sizeof(datadir_thread_ctxt_t) * n));
+				(malloc(sizeof(datadir_thread_ctxt_t) * n));
 
-	count_mutex = os_mutex_create();
+  pthread_mutex_init(&count_mutex, NULL);
 	count = n;
 
 	for (i = 0; i < n; i++) {
@@ -937,15 +937,15 @@ run_data_threads(datadir_iter_t *it, os_thread_func_t func, uint n)
 	/* Wait for threads to exit */
 	while (1) {
 		os_thread_sleep(100000);
-		os_mutex_enter(count_mutex);
+		pthread_mutex_lock(&count_mutex);
 		if (count == 0) {
-			os_mutex_exit(count_mutex);
+			pthread_mutex_unlock(&count_mutex);
 			break;
 		}
-		os_mutex_exit(count_mutex);
+		pthread_mutex_unlock(&count_mutex);
 	}
 
-	os_mutex_free(count_mutex);
+	pthread_mutex_destroy(&count_mutex);
 
 	ret = true;
 	for (i = 0; i < n; i++) {
@@ -1111,7 +1111,7 @@ read_link_file(const char *ibd_filepath, const char *link_filepath)
 			while (lastch > 4 && filepath[lastch] <= 0x20) {
 				filepath[lastch--] = 0x00;
 			}
-			srv_normalize_path_for_win(filepath);
+			os_normalize_path(filepath);
 		}
 
 		tablespace_locations[ibd_filepath] = filepath;

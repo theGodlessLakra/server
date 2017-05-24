@@ -1122,6 +1122,48 @@ rbt_merge_uniq(
 	return(n_merged);
 }
 
+/** Find the node that has the lowest key that is >= key.
+@return	node satisfying the lower bound constraint or NULL */
+const ib_rbt_node_t*
+rbt_lower_bound(
+	/*============*/
+	const ib_rbt_t*	tree,			/*!< in: rb tree */
+	const void*	key)			/*!< in: key to search */
+{
+	ib_rbt_node_t*	lb_node = NULL;
+	ib_rbt_node_t*	current = ROOT(tree);
+
+	while (current != tree->nil) {
+		int	result;
+
+		if (tree->cmp_arg) {
+			result = tree->compare_with_arg(
+				tree->cmp_arg, key, current->value);
+		}
+		else {
+			result = tree->compare(key, current->value);
+		}
+
+		if (result > 0) {
+
+			current = current->right;
+
+		}
+		else if (result < 0) {
+
+			lb_node = current;
+			current = current->left;
+
+		}
+		else {
+			lb_node = current;
+			break;
+		}
+	}
+
+	return(lb_node);
+}
+
 #if defined UNIV_DEBUG || defined IB_RBT_TESTING
 /**********************************************************************//**
 Check that every path from the root to the leaves has the same count and

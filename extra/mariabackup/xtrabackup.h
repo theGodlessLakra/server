@@ -44,7 +44,7 @@ typedef struct {
 	fil_space_t	*space;
 	fil_node_t	*node;
 	ibool		started;
-	os_ib_mutex_t	mutex;
+	pthread_mutex_t	mutex;
 } datafiles_iter_t;
 
 /* value of the --incremental option */

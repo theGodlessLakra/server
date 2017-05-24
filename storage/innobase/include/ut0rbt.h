@@ -241,6 +241,15 @@ rbt_merge_uniq(
 /*===========*/
 	ib_rbt_t*	dst,			/*!< in: dst rb tree */
 	const ib_rbt_t*	src);			/*!< in: src rb tree */
+
+/** Find the node that has the lowest key that is >= key.
+@return	node satisfying the lower bound constraint or NULL */
+const ib_rbt_node_t*
+rbt_lower_bound(
+	/*============*/
+	const ib_rbt_t*	tree,			/*!< in: rb tree */
+	const void*	key);			/*!< in: key to search */
+
 #if defined UNIV_DEBUG || defined IB_RBT_TESTING
 /**********************************************************************//**
 Verify the integrity of the RB tree. For debugging. 0 failure else height
