@@ -2583,6 +2583,21 @@ public:
 class Query_arena_memroot;
 /* The state of the lex parsing. This is saved in the THD struct */
 
+
+class Package_body: public Sql_alloc
+{
+public:
+  List<LEX> m_lex_list;
+  struct LEX *m_top_level_lex;
+  Package_body(LEX *top_level_lex)
+   :m_top_level_lex(top_level_lex)
+  {
+    m_lex_list.elements= 0;
+  }
+  void cleanup();
+};
+
+
 struct LEX: public Query_tables_list
 {
   SELECT_LEX_UNIT unit;                         /* most upper unit */
@@ -2603,6 +2618,8 @@ struct LEX: public Query_tables_list
 
   /* Query Plan Footprint of a currently running select  */
   Explain_query *explain;
+
+  Package_body *package_body;
 
   // type information
   CHARSET_INFO *charset;
@@ -3817,6 +3834,7 @@ public:
     /* Keep the parent SP stuff */
     sphead= oldlex->sphead;
     spcont= oldlex->spcont;
+    package_body= oldlex->package_body;
     /* Keep the parent trigger stuff too */
     trg_chistics= oldlex->trg_chistics;
     trg_table_fields.empty();

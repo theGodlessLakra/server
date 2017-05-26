@@ -107,7 +107,7 @@ enum
 
 /* Drop all routines in database 'db' */
 int
-sp_drop_db_routines(THD *thd, const char *db);
+sp_drop_db_routines(THD *thd, const char *db, const char *prefix= NULL);
 
 /**
    Acquires exclusive metadata lock on all stored routines in the
@@ -143,13 +143,18 @@ sp_show_create_routine(THD *thd, stored_procedure_type type, const sp_name *name
 bool
 sp_create_routine(THD *thd, stored_procedure_type type, sp_head *sp);
 
+bool
+sp_create_package(THD *thd, const sp_name *name, DDL_options_st ddl_options);
+
+bool
+sp_package_exists_or_error(THD *thd, const sp_name *name, bool if_exists);
+
 int
 sp_update_routine(THD *thd, stored_procedure_type type, const sp_name *name,
                   st_sp_chistics *chistics);
 
 int
 sp_drop_routine(THD *thd, stored_procedure_type type, const sp_name *name);
-
 
 /**
   Structure that represents element in the set of stored routines
@@ -192,7 +197,7 @@ public:
   Procedures for handling sets of stored routines used by statement or routine.
 */
 void sp_add_used_routine(Query_tables_list *prelocking_ctx, Query_arena *arena,
-                         const sp_name *rt, stored_procedure_type rt_type);
+                         sp_name *rt, stored_procedure_type rt_type);
 bool sp_add_used_routine(Query_tables_list *prelocking_ctx, Query_arena *arena,
                          const MDL_key *key, TABLE_LIST *belong_to_view);
 void sp_remove_not_own_routines(Query_tables_list *prelocking_ctx);

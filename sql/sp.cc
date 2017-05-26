@@ -1320,6 +1320,278 @@ done:
 }
 
 
+static bool
+show_create_package(THD *thd, String *buf,
+                    const sp_name *spname,
+                    DDL_options_st ddl_options)
+{
+  return
+    buf->append(STRING_WITH_LEN("CREATE ")) ||
+    (ddl_options.or_replace() &&
+     buf->append(STRING_WITH_LEN("OR REPLACE "))) ||
+    //TODO: append_definer(thd, buf, definer_user, definer_host);
+    buf->append(STRING_WITH_LEN("PACKAGE ")) ||
+    (ddl_options.if_not_exists() &&
+     buf->append(STRING_WITH_LEN("IF NOT EXISTS "))) ||
+    append_identifier(thd, buf, spname->m_name.str, spname->m_name.length) ||
+    buf->append(STRING_WITH_LEN(" AS END;"));
+}
+
+
+bool
+sp_create_package(THD *thd, const sp_name *spname, DDL_options_st ddl_options)
+{
+  bool ret= TRUE;
+  TABLE *table;
+  stored_procedure_type type= TYPE_ENUM_PROCEDURE;
+  //char definer_buf[USER_HOST_BUFF_SIZE];
+  //LEX_STRING definer;
+  sql_mode_t saved_mode= thd->variables.sql_mode;
+  MDL_key::enum_mdl_namespace mdl_type= MDL_key::PROCEDURE; // TODO
+
+  CHARSET_INFO *db_cs= get_default_db_collation(thd, spname->m_db.str);
+
+  enum_check_fields saved_count_cuted_fields;
+
+  bool store_failed= FALSE;
+  DBUG_ENTER("sp_create_package");
+  DBUG_PRINT("enter", ("name: %.*s",
+                       (int) spname->m_name.length, spname->m_name.str));
+  /* Grab an exclusive MDL lock. */
+  if (lock_object_name(thd, mdl_type, spname->m_db.str, spname->m_name.str))
+  {
+    my_error(ER_BAD_DB_ERROR, MYF(0), spname->m_db.str);
+    DBUG_RETURN(TRUE);
+  }
+
+  /*
+    Check that a database directory with this name
+    exists. Design note: This won't work on virtual databases
+    like information_schema.
+  */
+  if (check_db_dir_existence(spname->m_db.str))
+  {
+    my_error(ER_BAD_DB_ERROR, MYF(0), spname->m_db.str);
+    DBUG_RETURN(TRUE);
+  }
+
+
+  /* Reset sql_mode during data dictionary operations. */
+  thd->variables.sql_mode= 0;
+
+  saved_count_cuted_fields= thd->count_cuted_fields;
+  thd->count_cuted_fields= CHECK_FIELD_WARN;
+
+  if (!(table= open_proc_table_for_update(thd)))
+  {
+    my_error(ER_SP_STORE_FAILED, MYF(0),
+             SP_TYPE_STRING(type), spname->m_name.str);
+    goto done;
+  }
+  else
+  {
+    /* Checking if the routine already exists */
+    if (db_find_routine_aux(thd, type, spname, table) == SP_OK)
+    {
+      if (ddl_options.or_replace())
+      {
+        if ((ret= sp_drop_routine_internal(thd, type, spname, table)))
+          goto done;
+      }
+      else if (ddl_options.if_not_exists())
+      {
+        push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                            ER_SP_ALREADY_EXISTS,
+                            ER_THD(thd, ER_SP_ALREADY_EXISTS),
+                            "PACKAGE", spname->m_name.str);
+
+        ret= FALSE;
+        goto log;
+      }
+      else
+      {
+        my_error(ER_SP_ALREADY_EXISTS, MYF(0),
+                 stored_procedure_type_to_str(type),
+                 spname->m_name.str);
+        goto done;
+      }
+    }
+
+    restore_record(table, s->default_values); // Get default values for fields
+
+//    /* NOTE: all needed privilege checks have been already done. */
+//    thd->lex->definer->set_lex_string(&definer, definer_buf);
+
+    if (table->s->fields < MYSQL_PROC_FIELD_COUNT)
+    {
+      my_error(ER_SP_STORE_FAILED, MYF(0),
+               SP_TYPE_STRING(type), spname->m_name.str);
+      goto done;
+    }
+
+    if (system_charset_info->cset->numchars(system_charset_info,
+                                            spname->m_name.str,
+                                            spname->m_name.str +
+                                            spname->m_name.length) >
+        table->field[MYSQL_PROC_FIELD_NAME]->char_length())
+    {
+      my_error(ER_TOO_LONG_IDENT, MYF(0), spname->m_name.str);
+      goto done;
+    }
+    //if (sp->m_body.length > table->field[MYSQL_PROC_FIELD_BODY]->field_length)
+    //{
+    //  my_error(ER_TOO_LONG_BODY, MYF(0), sp->m_name.str);
+    //  goto done;
+    //}
+
+    store_failed=
+      table->field[MYSQL_PROC_FIELD_DB]->
+        store(spname->m_db.str, spname->m_db.length, system_charset_info);
+
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_NAME]->
+        store(spname->m_name.str, spname->m_name.length, system_charset_info);
+
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_MYSQL_TYPE]->
+        store((longlong) type, TRUE);
+
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_SPECIFIC_NAME]->
+        store(spname->m_name.str, spname->m_name.length, system_charset_info);
+
+    //if (sp->m_chistics->daccess != SP_DEFAULT_ACCESS)
+    //{
+    //  store_failed= store_failed ||
+    //    table->field[MYSQL_PROC_FIELD_ACCESS]->
+    //      store((longlong)sp->m_chistics->daccess, TRUE);
+    //}
+
+    //store_failed= store_failed ||
+    //  table->field[MYSQL_PROC_FIELD_DETERMINISTIC]->
+    //    store((longlong)(sp->m_chistics->detistic ? 1 : 2), TRUE);
+
+    //if (sp->m_chistics->suid != SP_IS_DEFAULT_SUID)
+    //{
+    //  store_failed= store_failed ||
+    //    table->field[MYSQL_PROC_FIELD_SECURITY_TYPE]->
+    //      store((longlong)sp->m_chistics->suid, TRUE);
+    //}
+
+    //store_failed= store_failed ||
+    //  table->field[MYSQL_PROC_FIELD_PARAM_LIST]->
+    //    store(sp->m_params.str, sp->m_params.length, system_charset_info);
+
+    //if (sp->m_type == TYPE_ENUM_FUNCTION)
+    //{
+    //  sp_returns_type(thd, retstr, sp);
+
+    //  store_failed= store_failed ||
+    //    table->field[MYSQL_PROC_FIELD_RETURNS]->
+    //      store(retstr.ptr(), retstr.length(), system_charset_info);
+    //}
+
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_BODY]->
+        store(C_STRING_WITH_LEN("AS BEGIN NULL; END"),
+              system_charset_info);
+
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_DEFINER]->
+        store(C_STRING_WITH_LEN("root@localhost"), system_charset_info);
+
+    ((Field_timestamp *)table->field[MYSQL_PROC_FIELD_CREATED])->set_time();
+    ((Field_timestamp *)table->field[MYSQL_PROC_FIELD_MODIFIED])->set_time();
+
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_SQL_MODE]->
+        store((longlong)saved_mode, TRUE);
+
+    //if (sp->m_chistics->comment.str)
+    //{
+    //  store_failed= store_failed ||
+    //    table->field[MYSQL_PROC_FIELD_COMMENT]->
+    //      store(sp->m_chistics->comment.str, sp->m_chistics->comment.length,
+    //            system_charset_info);
+    //}
+
+    table->field[MYSQL_PROC_FIELD_CHARACTER_SET_CLIENT]->set_notnull();
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_CHARACTER_SET_CLIENT]->store(
+        thd->charset()->csname,
+        strlen(thd->charset()->csname),
+        system_charset_info);
+
+    table->field[MYSQL_PROC_FIELD_COLLATION_CONNECTION]->set_notnull();
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_COLLATION_CONNECTION]->store(
+        thd->variables.collation_connection->name,
+        strlen(thd->variables.collation_connection->name),
+        system_charset_info);
+
+    table->field[MYSQL_PROC_FIELD_DB_COLLATION]->set_notnull();
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_DB_COLLATION]->store(
+        db_cs->name, strlen(db_cs->name), system_charset_info);
+
+    table->field[MYSQL_PROC_FIELD_BODY_UTF8]->set_notnull();
+    store_failed= store_failed ||
+      table->field[MYSQL_PROC_FIELD_BODY_UTF8]->store(
+        C_STRING_WITH_LEN("AS BEGIN NULL; END"), system_charset_info);
+
+    if (store_failed)
+    {
+      my_error(ER_CANT_CREATE_SROUTINE, MYF(0), spname->m_name.str);
+      goto done;
+    }
+
+    if (table->file->ha_write_row(table->record[0]))
+    {
+      ret= true;
+      my_error(ER_SP_ALREADY_EXISTS, MYF(0),
+               SP_TYPE_STRING(type), spname->m_name.str);
+      goto done;
+    }
+    /* Make change permanent and avoid 'table is marked as crashed' errors */
+    table->file->extra(HA_EXTRA_FLUSH);
+
+    sp_cache_invalidate();
+  }
+
+log:
+  if (mysql_bin_log.is_open())
+  {
+    thd->clear_error();
+
+    StringBuffer<128> log_query(system_charset_info);
+    if (show_create_package(thd, &log_query, spname, ddl_options))
+    {
+      my_error(ER_OUT_OF_RESOURCES, MYF(0));
+      goto done;
+    }
+    /* restore sql_mode when binloging */
+    thd->variables.sql_mode= saved_mode;
+    /* Such a statement can always go directly to binlog, no trans cache */
+    if (thd->binlog_query(THD::STMT_QUERY_TYPE,
+                          log_query.ptr(), log_query.length(),
+                          FALSE, FALSE, FALSE, 0))
+    {
+      my_error(ER_ERROR_ON_WRITE, MYF(MY_WME), "binary log", -1);
+      goto done;
+    }
+    thd->variables.sql_mode= 0;
+  }
+  ret= FALSE;
+
+done:
+  thd->count_cuted_fields= saved_count_cuted_fields;
+  thd->variables.sql_mode= saved_mode;
+  DBUG_ASSERT(!thd->is_current_stmt_binlog_format_row());
+  DBUG_RETURN(ret);
+}
+
+
+
 /**
   Delete the record for the stored routine object from mysql.proc
   and do binary logging.
@@ -1592,7 +1864,7 @@ bool lock_db_routines(THD *thd, const char *db)
 */
 
 int
-sp_drop_db_routines(THD *thd, const char *db)
+sp_drop_db_routines(THD *thd, const char *db, const char *prefix)
 {
   TABLE *table;
   int ret;
@@ -1624,13 +1896,24 @@ sp_drop_db_routines(THD *thd, const char *db)
 
     do
     {
-      if (! table->file->ha_delete_row(table->record[0]))
-	deleted= TRUE;		/* We deleted something */
-      else
+      bool skip= false;
+      if (prefix)
       {
-	ret= SP_DELETE_ROW_FAILED;
-	nxtres= 0;
-	break;
+        Field *field= table->field[MYSQL_PROC_FIELD_NAME];
+        String tmp1, tmp2, *res= field->val_str(&tmp1, &tmp2);
+        size_t length= strlen(prefix);
+        skip= res->length() < length || memcmp(res->ptr(), prefix, length);
+      }
+      if (!skip)
+      {
+        if (! table->file->ha_delete_row(table->record[0]))
+          deleted= TRUE;                /* We deleted something */
+        else
+        {
+          ret= SP_DELETE_ROW_FAILED;
+          nxtres= 0;
+          break;
+        }
       }
     } while (!(nxtres= table->file->ha_index_next_same(table->record[0],
                                                        keybuf, key_len)));
@@ -1937,6 +2220,104 @@ bool sp_add_used_routine(Query_tables_list *prelocking_ctx, Query_arena *arena,
 
 
 /**
+  Check if the routine exists in mysql.proc.
+  @param thd  - current thd
+  @param name - the routine name
+  @param type - the routine type
+  @retval     - false, if the routine does not exist
+  @retval     - true, if the routine exists
+*/
+static bool
+sp_check_if_known_routine(THD *thd,
+                          const sp_name *name, stored_procedure_type type)
+{
+  bool rc;
+  sql_mode_t saved_mode= thd->variables.sql_mode;
+  Open_tables_backup open_tables_state_backup;
+  TABLE *table;
+  if (!(table= open_proc_table_for_read(thd, &open_tables_state_backup)))
+    return false;
+  thd->variables.sql_mode= 0;
+  rc= db_find_routine_aux(thd, type, name, table) == SP_OK;
+  thd->variables.sql_mode= saved_mode;
+  close_system_tables(thd, &open_tables_state_backup);
+  return rc;
+}
+
+
+static bool sp_check_if_package_exists(THD *thd, const sp_name *name)
+{
+  return sp_check_if_known_routine(thd, name, TYPE_ENUM_PROCEDURE);
+}
+
+
+/**
+  Check if a package exists.
+  @param - spname    - the package name
+  @param - if_exists - tells of "IF EXISTS" clause was specified.
+
+  @returns false   - on success (the package exists)
+  @returns true    - on error (the package does not exists)
+
+  In case if the package does not exist, an error or a warning is issued,
+  depending on the "if_exists" parameter.
+*/
+
+bool sp_package_exists_or_error(THD *thd, const sp_name *spname, bool if_exists)
+{
+  if (sp_check_if_package_exists(thd, spname))
+    return false; // Package exists
+  if (!if_exists)
+  {
+    my_error(ER_SP_DOES_NOT_EXIST, MYF(0),
+             "PACKAGE", ErrConvDQName(spname).ptr());
+  }
+  else
+  {
+    push_warning_printf(thd, Sql_condition::WARN_LEVEL_NOTE,
+                        ER_SP_DOES_NOT_EXIST,
+                        ER_THD(thd, ER_SP_ALREADY_EXISTS),
+                        "PACKAGE", ErrConvDQName(spname).ptr());
+  }
+  return true; // Package does not exist
+}
+
+
+static bool
+rewrite_spname_if_known_package(THD *thd, sp_name *name,
+                                const LEX_CSTRING &package,
+                                const LEX_CSTRING &routine)
+{
+  LEX_CSTRING tmpdb= thd->db_lex_cstring();
+  sp_name tmp(&tmpdb, &package, false);
+  if (!sp_check_if_package_exists(thd, &tmp))
+    return false;
+  return name->make_package_routine_name(thd, tmpdb, package, routine);
+}
+
+
+static bool
+rewrite_spname_if_known_package_routine(THD *thd, sp_name *name,
+                                        enum stored_procedure_type type,
+                                        const LEX_CSTRING &package,
+                                        const LEX_CSTRING &routine)
+{
+  LEX_CSTRING tmpdb= thd->db_lex_cstring();
+  sp_name tmp(&null_clex_str, &null_clex_str, false);
+  sp_name tmp2(&tmpdb, &package, false);
+  if (!sp_check_if_package_exists(thd, &tmp2))
+    return false;
+
+  if (tmp.make_package_routine_name(thd, tmpdb, package, routine))
+    return true;
+
+  if (sp_check_if_known_routine(thd, &tmp, type))
+    *name= tmp;
+  return false;
+}
+
+
+/**
   Add routine which is explicitly used by statement to the set of stored
   routines used by this statement.
 
@@ -1955,8 +2336,46 @@ bool sp_add_used_routine(Query_tables_list *prelocking_ctx, Query_arena *arena,
 */
 
 void sp_add_used_routine(Query_tables_list *prelocking_ctx, Query_arena *arena,
-                         const sp_name *rt, enum stored_procedure_type rt_type)
+                         sp_name *rt, enum stored_procedure_type rt_type)
 {
+  THD *thd= current_thd;
+  const char *end;
+
+  if (thd->db && (thd->variables.sql_mode & MODE_ORACLE))
+  {
+    if (rt->m_explicit_name)
+    {
+      /*
+        If a qualified routine name was used, e.g. xxx.yyy(),
+        we possibly have a call to a package routine.
+        Rewrite rt if rt->m_db is a known package.
+      */
+      if (rewrite_spname_if_known_package(thd, rt, rt->m_db, rt->m_name))
+        return;
+    }
+    else if (thd->lex->sphead &&
+             thd->lex->sphead->m_name.length && // Not an anonymous block
+             (end= strchr(thd->lex->sphead->m_name.str, '.')))
+    {
+      char tmpbuf[SAFE_NAME_LEN];
+      LEX_CSTRING tmp;
+      /*
+        If a non-qualified routine was used, e.g. yyy(),
+        we possibly have a call from a package routine to another
+        routine of the same package.
+        The test above checks if the current routine name has a dot character.
+        Now lets cut the left part before the dot character.
+      */
+      tmp.length= my_snprintf(tmpbuf, sizeof(tmpbuf), "%.*s",
+                              (int) (end - thd->lex->sphead->m_name.str),
+                              thd->lex->sphead->m_name.str);
+      tmp.str= tmpbuf;
+      if (rewrite_spname_if_known_package_routine(thd, rt, rt_type,
+                                                  tmp, rt->m_name))
+        return;
+    }
+  }
+
   MDL_key key((rt_type == TYPE_ENUM_FUNCTION) ? MDL_key::FUNCTION :
                                                 MDL_key::PROCEDURE,
               rt->m_db.str, rt->m_name.str);
@@ -2346,4 +2765,3 @@ sp_load_for_information_schema(THD *thd, TABLE *proc_table, String *db,
   thd->lex= old_lex;
   return sp;
 }
-

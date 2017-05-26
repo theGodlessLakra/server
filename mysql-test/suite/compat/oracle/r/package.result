@@ -1,0 +1,1169 @@
+SET sql_mode=ORACLE;
+#
+# Creating a body of a non-existing package
+#
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS BEGIN RETURN 10; END;
+END;
+$$
+ERROR 42000: PACKAGE test.test2 does not exist
+#
+# Dropping a non-existing package
+#
+DROP PACKAGE test2;
+ERROR 42000: PACKAGE test.test2 does not exist
+DROP PACKAGE IF EXISTS test2;
+Warnings:
+Note	1305	PACKAGE test.test2 does not exist
+DROP PACKAGE BODY test2;
+ERROR 42000: PACKAGE test.test2 does not exist
+#
+# PACKAGE and PS
+#
+PREPARE stmt FROM 'CREATE PACKAGE test2 AS FUNCTION f1 RETURN INT; END test2';
+ERROR HY000: This command is not supported in the prepared statement protocol yet
+PREPARE stmt FROM 'CREATE PACKAGE BODY test2 AS'
+                  '  FUNCTION f1 RETURN INT AS BEGIN RETURN 10; END;'
+                  'END test2';
+ERROR HY000: This command is not supported in the prepared statement protocol yet
+#
+# Package and READ ONLY transactions
+#
+SET SESSION TRANSACTION READ ONLY;
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END
+$$
+ERROR 25006: Cannot execute statement in a READ ONLY transaction
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS BEGIN RETURN 10; END;
+FUNCTION f2 RETURN INT AS BEGIN RETURN f1(); END;
+PROCEDURE p1 AS
+BEGIN
+SELECT f2();
+END;
+END;
+$$
+ERROR 25006: Cannot execute statement in a READ ONLY transaction
+DROP PACKAGE test2;
+ERROR 25006: Cannot execute statement in a READ ONLY transaction
+DROP PACKAGE BODY test2;
+ERROR 25006: Cannot execute statement in a READ ONLY transaction
+SET SESSION TRANSACTION READ WRITE;
+#
+# Syntax error inside a CREATE PACKAGE, inside a routine definition
+#
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+FUNCTION f2 RETURN INT;
+FUNCTION f3;
+FUNCTION f4 RETURN INT;
+END
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ';
+FUNCTION f4 RETURN INT;
+END' at line 4
+#
+# Syntax error inside a CREATE PACKAGE, outside of a routine definition
+#
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+FUNCTION f2 RETURN INT;
+FUNCTION f3 RETURN INT AS BEGIN RETURN 10; END;
+FUNCTION f4 RETURN INT;
+END
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'AS BEGIN RETURN 10; END;
+FUNCTION f4 RETURN INT;
+END' at line 4
+#
+# Syntax error inside a CREATE PACKAGE BODY, inside a routine definition
+#
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS BEGIN RETURN 10; END;
+FUNCTION f2 RETURN INT; -- Missing "AS BEGIN..END;"
+END
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '; -- Missing "AS BEGIN..END;"
+END' at line 3
+#
+# Syntax error inside a CREATE PACKAGE BODY, outside a routine definition
+#
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS BEGIN RETURN 10; END;
+SOME SYNTAX ERROR;
+FUNCTION f2 RETURN INT AS BEGIN RETURN 10; END;
+END
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'SOME SYNTAX ERROR;
+FUNCTION f2 RETURN INT AS BEGIN RETURN 10; END;
+END' at line 3
+#
+# Creating a new package
+#
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT DETERMINISTIC;
+FUNCTION f2(a INT) RETURN INT;
+FUNCTION concat RETURN INT;
+PROCEDURE p1;
+PROCEDURE p2(a INT);
+END
+$$
+Warnings:
+Note	1585	This function 'concat' has the same name as a native function
+SELECT * FROM mysql.proc WHERE db='test' AND name='test2';
+db	test
+name	test2
+type	PROCEDURE
+specific_name	test2
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	
+returns	
+body	AS BEGIN NULL; END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS BEGIN NULL; END
+SELECT * FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_SCHEMA='test' AND ROUTINE_NAME='test2';
+SPECIFIC_NAME	test2
+ROUTINE_CATALOG	def
+ROUTINE_SCHEMA	test
+ROUTINE_NAME	test2
+ROUTINE_TYPE	PROCEDURE
+DATA_TYPE	
+CHARACTER_MAXIMUM_LENGTH	NULL
+CHARACTER_OCTET_LENGTH	NULL
+NUMERIC_PRECISION	NULL
+NUMERIC_SCALE	NULL
+DATETIME_PRECISION	NULL
+CHARACTER_SET_NAME	NULL
+COLLATION_NAME	NULL
+DTD_IDENTIFIER	NULL
+ROUTINE_BODY	SQL
+ROUTINE_DEFINITION	AS BEGIN NULL; END
+EXTERNAL_NAME	NULL
+EXTERNAL_LANGUAGE	NULL
+PARAMETER_STYLE	SQL
+IS_DETERMINISTIC	NO
+SQL_DATA_ACCESS	CONTAINS SQL
+SQL_PATH	NULL
+SECURITY_TYPE	DEFINER
+CREATED	#
+LAST_ALTERED	#
+SQL_MODE	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+ROUTINE_COMMENT	
+DEFINER	root@localhost
+CHARACTER_SET_CLIENT	latin1
+COLLATION_CONNECTION	latin1_swedish_ci
+DATABASE_COLLATION	latin1_swedish_ci
+CREATE PACKAGE IF NOT EXISTS test2 AS
+FUNCTION f1 RETURN INT;
+END test2
+$$
+Warnings:
+Note	1304	PACKAGE test2 already exists
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS BEGIN RETURN 10; END;
+FUNCTION f2(a INT) RETURN INT AS BEGIN RETURN f1()+a; END;
+PROCEDURE p1 AS
+BEGIN
+SELECT f2(0);
+END;
+PROCEDURE p2(a INT) AS
+BEGIN
+SELECT f2(a);
+END;
+END;
+$$
+SELECT test2.f1();
+test2.f1()
+10
+SELECT test2.f2(1);
+test2.f2(1)
+11
+CALL test2.p1();
+f2(0)
+10
+CALL test2.p2(1);
+f2(a)
+11
+SELECT * FROM mysql.proc WHERE db='test' AND name LIKE 'test2.%';
+db	test
+name	test2.f1
+type	FUNCTION
+specific_name	test2.f1
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	
+returns	int(11)
+body	AS BEGIN RETURN 10; END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS BEGIN RETURN 10; END
+db	test
+name	test2.f2
+type	FUNCTION
+specific_name	test2.f2
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	a INT
+returns	int(11)
+body	AS BEGIN RETURN f1()+a; END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS BEGIN RETURN f1()+a; END
+db	test
+name	test2.p1
+type	PROCEDURE
+specific_name	test2.p1
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	
+returns	
+body	AS
+BEGIN
+SELECT f2(0);
+END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS
+BEGIN
+SELECT f2(0);
+END
+db	test
+name	test2.p2
+type	PROCEDURE
+specific_name	test2.p2
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	a INT
+returns	
+body	AS
+BEGIN
+SELECT f2(a);
+END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS
+BEGIN
+SELECT f2(a);
+END
+SELECT * FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_SCHEMA='test' AND ROUTINE_NAME LIKE 'test2.%';
+SPECIFIC_NAME	test2.f1
+ROUTINE_CATALOG	def
+ROUTINE_SCHEMA	test
+ROUTINE_NAME	test2.f1
+ROUTINE_TYPE	FUNCTION
+DATA_TYPE	int
+CHARACTER_MAXIMUM_LENGTH	NULL
+CHARACTER_OCTET_LENGTH	NULL
+NUMERIC_PRECISION	10
+NUMERIC_SCALE	0
+DATETIME_PRECISION	NULL
+CHARACTER_SET_NAME	NULL
+COLLATION_NAME	NULL
+DTD_IDENTIFIER	int(11)
+ROUTINE_BODY	SQL
+ROUTINE_DEFINITION	AS BEGIN RETURN 10; END
+EXTERNAL_NAME	NULL
+EXTERNAL_LANGUAGE	NULL
+PARAMETER_STYLE	SQL
+IS_DETERMINISTIC	NO
+SQL_DATA_ACCESS	CONTAINS SQL
+SQL_PATH	NULL
+SECURITY_TYPE	DEFINER
+CREATED	#
+LAST_ALTERED	#
+SQL_MODE	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+ROUTINE_COMMENT	
+DEFINER	root@localhost
+CHARACTER_SET_CLIENT	latin1
+COLLATION_CONNECTION	latin1_swedish_ci
+DATABASE_COLLATION	latin1_swedish_ci
+SPECIFIC_NAME	test2.f2
+ROUTINE_CATALOG	def
+ROUTINE_SCHEMA	test
+ROUTINE_NAME	test2.f2
+ROUTINE_TYPE	FUNCTION
+DATA_TYPE	int
+CHARACTER_MAXIMUM_LENGTH	NULL
+CHARACTER_OCTET_LENGTH	NULL
+NUMERIC_PRECISION	10
+NUMERIC_SCALE	0
+DATETIME_PRECISION	NULL
+CHARACTER_SET_NAME	NULL
+COLLATION_NAME	NULL
+DTD_IDENTIFIER	int(11)
+ROUTINE_BODY	SQL
+ROUTINE_DEFINITION	AS BEGIN RETURN f1()+a; END
+EXTERNAL_NAME	NULL
+EXTERNAL_LANGUAGE	NULL
+PARAMETER_STYLE	SQL
+IS_DETERMINISTIC	NO
+SQL_DATA_ACCESS	CONTAINS SQL
+SQL_PATH	NULL
+SECURITY_TYPE	DEFINER
+CREATED	#
+LAST_ALTERED	#
+SQL_MODE	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+ROUTINE_COMMENT	
+DEFINER	root@localhost
+CHARACTER_SET_CLIENT	latin1
+COLLATION_CONNECTION	latin1_swedish_ci
+DATABASE_COLLATION	latin1_swedish_ci
+SPECIFIC_NAME	test2.p1
+ROUTINE_CATALOG	def
+ROUTINE_SCHEMA	test
+ROUTINE_NAME	test2.p1
+ROUTINE_TYPE	PROCEDURE
+DATA_TYPE	
+CHARACTER_MAXIMUM_LENGTH	NULL
+CHARACTER_OCTET_LENGTH	NULL
+NUMERIC_PRECISION	NULL
+NUMERIC_SCALE	NULL
+DATETIME_PRECISION	NULL
+CHARACTER_SET_NAME	NULL
+COLLATION_NAME	NULL
+DTD_IDENTIFIER	NULL
+ROUTINE_BODY	SQL
+ROUTINE_DEFINITION	AS
+BEGIN
+SELECT f2(0);
+END
+EXTERNAL_NAME	NULL
+EXTERNAL_LANGUAGE	NULL
+PARAMETER_STYLE	SQL
+IS_DETERMINISTIC	NO
+SQL_DATA_ACCESS	CONTAINS SQL
+SQL_PATH	NULL
+SECURITY_TYPE	DEFINER
+CREATED	#
+LAST_ALTERED	#
+SQL_MODE	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+ROUTINE_COMMENT	
+DEFINER	root@localhost
+CHARACTER_SET_CLIENT	latin1
+COLLATION_CONNECTION	latin1_swedish_ci
+DATABASE_COLLATION	latin1_swedish_ci
+SPECIFIC_NAME	test2.p2
+ROUTINE_CATALOG	def
+ROUTINE_SCHEMA	test
+ROUTINE_NAME	test2.p2
+ROUTINE_TYPE	PROCEDURE
+DATA_TYPE	
+CHARACTER_MAXIMUM_LENGTH	NULL
+CHARACTER_OCTET_LENGTH	NULL
+NUMERIC_PRECISION	NULL
+NUMERIC_SCALE	NULL
+DATETIME_PRECISION	NULL
+CHARACTER_SET_NAME	NULL
+COLLATION_NAME	NULL
+DTD_IDENTIFIER	NULL
+ROUTINE_BODY	SQL
+ROUTINE_DEFINITION	AS
+BEGIN
+SELECT f2(a);
+END
+EXTERNAL_NAME	NULL
+EXTERNAL_LANGUAGE	NULL
+PARAMETER_STYLE	SQL
+IS_DETERMINISTIC	NO
+SQL_DATA_ACCESS	CONTAINS SQL
+SQL_PATH	NULL
+SECURITY_TYPE	DEFINER
+CREATED	#
+LAST_ALTERED	#
+SQL_MODE	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+ROUTINE_COMMENT	
+DEFINER	root@localhost
+CHARACTER_SET_CLIENT	latin1
+COLLATION_CONNECTION	latin1_swedish_ci
+DATABASE_COLLATION	latin1_swedish_ci
+DROP PACKAGE BODY test2;
+SELECT test2.f1();
+ERROR 42000: FUNCTION test.test2.f1 does not exist
+SELECT test2.f2();
+ERROR 42000: FUNCTION test.test2.f2 does not exist
+CALL test2.p1();
+ERROR 42000: PROCEDURE test.test2.p1 does not exist
+DROP PACKAGE BODY IF EXISTS test2;
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'IF EXISTS test2' at line 1
+# "DROP PACKAGE BODY" now does sp_drop_db_routines.
+# So dropping a body which was already dropped before returns no errors.
+DROP PACKAGE BODY test2;
+DROP PACKAGE test2;
+#
+# Package routines accessing tables
+#
+CREATE TABLE t1 (a INT);
+CREATE PACKAGE test2 AS
+PROCEDURE p1(a INT);
+END;
+$$
+CREATE PACKAGE BODY test2 AS
+PROCEDURE p1(a INT) AS
+BEGIN
+INSERT INTO t1 VALUES (10);
+END;
+END;
+$$
+CALL test2.p1(10);
+SELECT * FROM t1;
+a
+10
+DROP PACKAGE test2;
+DROP TABLE t1;
+#
+# CREATA PACKAGE: Optional package name after the "END" keyword
+#
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test2.test2
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '.test2' at line 4
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test3
+$$
+ERROR HY000: END identifier 'test3' does not match 'test2'
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test2
+$$
+DROP PACKAGE test2;
+#
+# MDEV-12089 sql_mode=ORACLE: Understand optional routine name after the END keyword
+#
+CREATE PACKAGE test2 AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END test2;
+$$
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END f1.f1;
+END test2;
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '.f1;
+END test2' at line 5
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END f2;
+END test2;
+$$
+ERROR HY000: END identifier 'f2' does not match 'f1'
+CREATE PACKAGE BODY test2 AS
+PROCEDURE p1 AS
+BEGIN
+NULL;
+END p1.p1;
+END test2;
+$$
+ERROR 42000: You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near '.p1;
+END test2' at line 5
+CREATE PACKAGE BODY test2 AS
+PROCEDURE p1 AS
+BEGIN
+NULL;
+END p2;
+END test2;
+$$
+ERROR HY000: END identifier 'p2' does not match 'p1'
+CREATE PACKAGE BODY test2 AS
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END f1;
+PROCEDURE p1 AS
+BEGIN
+NULL;
+END p1;
+END test2;
+$$
+DROP PACKAGE test2;
+#
+# Testing various qualified/non-qualified db/package SP call chains
+#
+CREATE FUNCTION f3() RETURN TEXT AS
+BEGIN
+SET @track= @track || ' ' || 'test.f3()';
+RETURN '';
+END;
+$$
+CREATE PROCEDURE p3() AS
+BEGIN
+SET @track= @track || ' ' || 'test.p3()';
+END;
+$$
+CREATE FUNCTION ff2(task TEXT) RETURN TEXT AS
+step TEXT := REGEXP_SUBSTR(task,'^[^ ]*');
+tail TEXT := REGEXP_REPLACE(task,'^[^ ]*[ ]*(.*)','\\1');
+rc TEXT;
+BEGIN
+SET @track= @track || ' ' || 'test.ff2()';
+CASE step
+WHEN ''         THEN NULL;
+WHEN 'p3'       THEN CALL p3();
+WHEN 'f3'       THEN rc:= f3();
+WHEN 'pack.p2'  THEN CALL pack.p2(tail);
+WHEN 'pack.f2'  THEN rc:= pack.f2(tail);
+WHEN 'pack.p3'  THEN CALL pack.p3();
+WHEN 'pack.f3'  THEN rc:= pack.f3();
+WHEN 'test.p3'  THEN CALL test.p3();
+WHEN 'test.f3'  THEN rc:= test.f3();
+WHEN 'test.pp2' THEN CALL test.pp2(tail);
+WHEN 'test.ff2' THEN rc:= test.ff2(tail);
+ELSE SET @track= @track || ' ' || step || ' [unknown step]';
+END CASE;
+RETURN '';
+END;
+$$
+CREATE PROCEDURE pp2(task TEXT) AS
+step TEXT := REGEXP_SUBSTR(task,'^[^ ]*');
+tail TEXT := REGEXP_REPLACE(task,'^[^ ]*[ ]*(.*)','\\1');
+rc TEXT;
+BEGIN
+SET @track= @track || ' ' || 'test.pp2()';
+CASE step
+WHEN ''         THEN NULL;
+WHEN 'p3'       THEN CALL p3();
+WHEN 'f3'       THEN rc:= f3();
+WHEN 'pack.p2'  THEN CALL pack.p2(tail);
+WHEN 'pack.f2'  THEN rc:= pack.f2(tail);
+WHEN 'pack.p3'  THEN CALL pack.p3();
+WHEN 'pack.f3'  THEN rc:= pack.f3();
+WHEN 'test.p3'  THEN CALL test.p3();
+WHEN 'test.f3'  THEN rc:= test.f3();
+WHEN 'test.pp2' THEN CALL test.pp2(tail);
+WHEN 'test.ff2' THEN rc:= test.ff2(tail);
+ELSE SET @track= @track || ' ' || step || ' [unknown step]';
+END CASE;
+END;
+$$
+CREATE PACKAGE pack AS
+PROCEDURE p1(step1 TEXT, step2 TEXT);
+FUNCTION f2(step2 TEXT) RETURN TEXT;
+FUNCTION f3 RETURN TEXT;
+PROCEDURE p3;
+END;
+$$
+CREATE PACKAGE BODY pack AS
+PROCEDURE p1(task TEXT) AS
+step TEXT := REGEXP_SUBSTR(task,'^[^ ]*');
+tail TEXT := REGEXP_REPLACE(task,'^[^ ]*[ ]*(.*)','\\1');
+rc TEXT;
+BEGIN
+SET @track= 'test.pack.p1()';
+CASE step
+WHEN ''         THEN NULL;
+WHEN 'p2'       THEN CALL p2(tail);
+WHEN 'f2'       THEN rc:= f2(tail);
+WHEN 'p3'       THEN CALL p3();
+WHEN 'f3'       THEN rc:= f3();
+WHEN 'px'       THEN CALL px();
+WHEN 'fx'       THEN rc:= fx();
+WHEN 'pp2'      THEN CALL pp2(tail);
+WHEN 'ff2'      THEN rc:= ff2(tail);
+WHEN 'pack.p2'  THEN CALL pack.p2(tail);
+WHEN 'pack.f2'  THEN rc:= pack.f2(tail);
+WHEN 'pack.p3'  THEN CALL pack.p3();
+WHEN 'pack.f3'  THEN rc:= pack.f3();
+WHEN 'pack.px'  THEN CALL pack.px();
+WHEN 'pack.fx'  THEN rc:= pack.fx();
+WHEN 'test.p3'  THEN CALL test.p3();
+WHEN 'test.f3'  THEN rc:= test.f3();
+WHEN 'test.pp2' THEN CALL test.pp2(tail);
+WHEN 'test.ff2' THEN rc:= test.ff2(tail);
+ELSE SET @track= @track || ' ' || step || ' [unknown step]';
+END CASE;
+SELECT @track;
+END;
+FUNCTION f1(task TEXT) RETURN TEXT AS
+step TEXT := REGEXP_SUBSTR(task,'^[^ ]*');
+tail TEXT := REGEXP_REPLACE(task,'^[^ ]*[ ]*(.*)','\\1');
+rc TEXT;
+BEGIN
+SET @track= 'test.pack.f1()';
+CASE step
+WHEN ''         THEN NULL;
+WHEN 'p2'       THEN CALL p2(tail);
+WHEN 'f2'       THEN rc:= f2(tail);
+WHEN 'p3'       THEN CALL p3();
+WHEN 'f3'       THEN rc:= f3();
+WHEN 'px'       THEN CALL px();
+WHEN 'fx'       THEN rc:= fx();
+WHEN 'pp2'      THEN CALL pp2(tail);
+WHEN 'ff2'      THEN rc:= ff2(tail);
+WHEN 'pack.p2'  THEN CALL pack.p2(tail);
+WHEN 'pack.f2'  THEN rc:= pack.f2(tail);
+WHEN 'pack.p3'  THEN CALL pack.p3();
+WHEN 'pack.f3'  THEN rc:= pack.f3();
+WHEN 'pack.px'  THEN CALL pack.px();
+WHEN 'pack.fx'  THEN rc:= pack.fx();
+WHEN 'test.p3'  THEN CALL test.p3();
+WHEN 'test.f3'  THEN rc:= test.f3();
+WHEN 'test.pp2' THEN CALL test.pp2(tail);
+WHEN 'test.ff2' THEN rc:= test.ff2(tail);
+ELSE SET @track= @track || ' ' || step || ' [unknown step]';
+END CASE;
+SIGNAL SQLSTATE '01000' SET MESSAGE_TEXT=@track;
+RETURN '';
+END;
+PROCEDURE p2(task TEXT) AS
+step TEXT := REGEXP_SUBSTR(task,'^[^ ]*');
+tail TEXT := REGEXP_REPLACE(task,'^[^ ]*[ ]*(.*)','\\1');
+rc TEXT;
+BEGIN
+SET @track= @track || ' ' || 'test.pack.p2()';
+CASE step
+WHEN ''         THEN NULL;
+WHEN 'p2'       THEN CALL p2(tail);
+WHEN 'f2'       THEN rc:= f2(tail);
+WHEN 'p3'       THEN CALL p3();
+WHEN 'f3'       THEN rc:= f3();
+WHEN 'px'       THEN CALL px();
+WHEN 'fx'       THEN rc:= fx();
+WHEN 'pp2'      THEN CALL pp2(tail);
+WHEN 'ff2'      THEN rc:= ff2(tail);
+WHEN 'pack.p2'  THEN CALL pack.p2(tail);
+WHEN 'pack.f2'  THEN rc:= pack.f2(tail);
+WHEN 'pack.p3'  THEN CALL pack.p3();
+WHEN 'pack.f3'  THEN rc:= pack.f3();
+WHEN 'pack.px'  THEN CALL pack.px();
+WHEN 'pack.fx'  THEN rc:= pack.fx();
+WHEN 'test.p3'  THEN CALL test.p3();
+WHEN 'test.f3'  THEN rc:= test.f3();
+WHEN 'test.pp2' THEN CALL test.pp2(tail);
+WHEN 'test.ff2' THEN rc:= test.ff2(tail);
+ELSE SET @track= @track || ' ' || step || ' [unknown step]';
+END CASE;
+END;
+FUNCTION f2(task TEXT) RETURN TEXT AS
+step TEXT := REGEXP_SUBSTR(task,'^[^ ]*');
+tail TEXT := REGEXP_REPLACE(task,'^[^ ]*[ ]*(.*)','\\1');
+rc TEXT;
+BEGIN
+SET @track= @track || ' ' || 'test.pack.f2()';
+CASE step
+WHEN ''         THEN NULL;
+WHEN 'p2'       THEN CALL p2(tail);
+WHEN 'f2'       THEN rc:= f2(tail);
+WHEN 'p3'       THEN CALL p3();
+WHEN 'f3'       THEN rc:= f3();
+WHEN 'px'       THEN CALL px();
+WHEN 'fx'       THEN rc:= fx();
+WHEN 'pp2'      THEN CALL pp2(tail);
+WHEN 'ff2'      THEN rc:= ff2(tail);
+WHEN 'pack.p2'  THEN CALL pack.p2(tail);
+WHEN 'pack.f2'  THEN rc:= pack.f2(tail);
+WHEN 'pack.p3'  THEN CALL pack.p3();
+WHEN 'pack.f3'  THEN rc:= pack.f3();
+WHEN 'pack.px'  THEN CALL pack.px();
+WHEN 'pack.fx'  THEN rc:= pack.fx();
+WHEN 'test.p3'  THEN CALL test.p3();
+WHEN 'test.f3'  THEN rc:= test.f3();
+WHEN 'test.pp2' THEN CALL test.pp2(tail);
+WHEN 'test.ff2' THEN rc:= test.ff2(tail);
+ELSE SET @track= @track || ' ' || step || ' [unknown step]';
+END CASE;
+RETURN '';
+END;
+PROCEDURE p3 AS
+BEGIN
+SET @track= @track || ' ' || 'test.pack.p3()';
+END;
+FUNCTION f3 RETURN TEXT AS
+BEGIN
+SET @track= @track || ' ' || 'test.pack.f3()';
+RETURN '';
+END;
+END pack;
+$$
+SET max_sp_recursion_depth=10;
+# pack.routine -> *
+CALL pack.p1('p2');
+@track
+test.pack.p1() test.pack.p2()
+CALL pack.p1('f2');
+@track
+test.pack.p1() test.pack.f2()
+CALL pack.p1('px');
+ERROR 42000: PROCEDURE test.px does not exist
+CALL pack.p1('fx');
+ERROR 42000: FUNCTION test.fx does not exist
+CALL pack.p1('pp2');
+@track
+test.pack.p1() test.pp2()
+CALL pack.p1('ff2');
+@track
+test.pack.p1() test.ff2()
+CALL pack.p1('pack.p2');
+@track
+test.pack.p1() test.pack.p2()
+CALL pack.p1('pack.f2');
+@track
+test.pack.p1() test.pack.f2()
+CALL pack.p1('pack.px');
+ERROR 42000: PROCEDURE test.pack.px does not exist
+CALL pack.p1('pack.fx');
+ERROR 42000: FUNCTION test.pack.fx does not exist
+CALL pack.p1('test.pp2');
+@track
+test.pack.p1() test.pp2()
+CALL pack.p1('test.ff2');
+@track
+test.pack.p1() test.ff2()
+DO pack.f1('p2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2()
+DO pack.f1('f2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2()
+DO pack.p1('px');
+ERROR 42000: FUNCTION test.pack.p1 does not exist
+DO pack.p1('fx');
+ERROR 42000: FUNCTION test.pack.p1 does not exist
+DO pack.f1('pp2');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2()
+DO pack.f1('ff2');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2()
+DO pack.f1('pack.p2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2()
+DO pack.f1('pack.f2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2()
+SELECT pack.f1('pack.px');
+ERROR 42000: PROCEDURE test.pack.px does not exist
+SELECT pack.f1('pack.fx');
+ERROR 42000: FUNCTION test.pack.fx does not exist
+DO pack.f1('test.pp2');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2()
+DO pack.f1('test.ff2');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2()
+#
+# Qualified_package_routine -> Non_qualified_package_routine
+#
+# pack.routine -> [pack.]routine -> pack.routine
+CALL pack.p1('p2 pack.p3');
+@track
+test.pack.p1() test.pack.p2() test.pack.p3()
+CALL pack.p1('p2 pack.f3');
+@track
+test.pack.p1() test.pack.p2() test.pack.f3()
+CALL pack.p1('f2 pack.p3');
+@track
+test.pack.p1() test.pack.f2() test.pack.p3()
+CALL pack.p1('f2 pack.f3');
+@track
+test.pack.p1() test.pack.f2() test.pack.f3()
+DO pack.f1('p2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.p3()
+DO pack.f1('p2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.f3()
+DO pack.f1('f2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.p3()
+DO pack.f1('f2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.f3()
+# pack.routine -> [pack.]routine -> [pack]routine
+CALL pack.p1('p2 p3');
+@track
+test.pack.p1() test.pack.p2() test.pack.p3()
+CALL pack.p1('p2 f3');
+@track
+test.pack.p1() test.pack.p2() test.pack.f3()
+CALL pack.p1('f2 p3');
+@track
+test.pack.p1() test.pack.f2() test.pack.p3()
+CALL pack.p1('f2 f3');
+@track
+test.pack.p1() test.pack.f2() test.pack.f3()
+DO pack.f1('p2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.p3()
+DO pack.f1('p2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.f3()
+DO pack.f1('f2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.p3()
+DO pack.f1('f2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.f3()
+# pack.routine -> [pack.]routine -> test.routine
+CALL pack.p1('p2 test.p3');
+@track
+test.pack.p1() test.pack.p2() test.p3()
+CALL pack.p1('p2 test.f3');
+@track
+test.pack.p1() test.pack.p2() test.f3()
+CALL pack.p1('f2 test.p3');
+@track
+test.pack.p1() test.pack.f2() test.p3()
+CALL pack.p1('f2 test.f3');
+@track
+test.pack.p1() test.pack.f2() test.f3()
+DO pack.f1('p2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.p3()
+DO pack.f1('p2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.f3()
+DO pack.f1('f2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.p3()
+DO pack.f1('f2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.f3()
+# pack.routine -> [pack.]routine -> [test.]routine
+CALL pack.p1('p2 pp2');
+@track
+test.pack.p1() test.pack.p2() test.pp2()
+CALL pack.p1('p2 ff2');
+@track
+test.pack.p1() test.pack.p2() test.ff2()
+CALL pack.p1('f2 pp2');
+@track
+test.pack.p1() test.pack.f2() test.pp2()
+CALL pack.p1('f2 ff2');
+@track
+test.pack.p1() test.pack.f2() test.ff2()
+DO pack.f1('p2 pp2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pp2()
+DO pack.f1('p2 ff2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.ff2()
+DO pack.f1('f2 pp2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pp2()
+DO pack.f1('f2 ff2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.ff2()
+#
+# Qualified_package_routine -> Non_qualified_database_routine
+#
+# pack.routine -> [test.]routine -> pack.routine
+CALL pack.p1('pp2 pack.p3');
+@track
+test.pack.p1() test.pp2() test.pack.p3()
+CALL pack.p1('pp2 pack.f3');
+@track
+test.pack.p1() test.pp2() test.pack.f3()
+CALL pack.p1('ff2 pack.p3');
+@track
+test.pack.p1() test.ff2() test.pack.p3()
+CALL pack.p1('ff2 pack.f3');
+@track
+test.pack.p1() test.ff2() test.pack.f3()
+DO pack.f1('pp2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.pack.p3()
+DO pack.f1('pp2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.pack.f3()
+DO pack.f1('ff2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.pack.p3()
+DO pack.f1('ff2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.pack.f3()
+# pack.routine -> [test.]routine -> test.routine
+CALL pack.p1('pp2 test.p3');
+@track
+test.pack.p1() test.pp2() test.p3()
+CALL pack.p1('pp2 test.f3');
+@track
+test.pack.p1() test.pp2() test.f3()
+CALL pack.p1('ff2 test.p3');
+@track
+test.pack.p1() test.ff2() test.p3()
+CALL pack.p1('ff2 test.f3');
+@track
+test.pack.p1() test.ff2() test.f3()
+DO pack.f1('pp2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.p3()
+DO pack.f1('pp2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.f3()
+DO pack.f1('ff2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.p3()
+DO pack.f1('ff2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.f3()
+# pack.routine -> [test.]routine -> [test.]routine
+CALL pack.p1('pp2 p3');
+@track
+test.pack.p1() test.pp2() test.p3()
+CALL pack.p1('pp2 f3');
+@track
+test.pack.p1() test.pp2() test.f3()
+CALL pack.p1('ff2 p3');
+@track
+test.pack.p1() test.ff2() test.p3()
+CALL pack.p1('ff2 f3');
+@track
+test.pack.p1() test.ff2() test.f3()
+DO pack.f1('pp2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.p3()
+DO pack.f1('pp2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.f3()
+DO pack.f1('ff2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.p3()
+DO pack.f1('ff2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.f3()
+#
+# Qualified_package_routine -> Qualified_package_routine
+#
+# pack.routine -> pack.routine -> pack.routine
+CALL pack.p1('pack.p2 pack.p3');
+@track
+test.pack.p1() test.pack.p2() test.pack.p3()
+CALL pack.p1('pack.p2 pack.f3');
+@track
+test.pack.p1() test.pack.p2() test.pack.f3()
+CALL pack.p1('pack.f2 pack.p3');
+@track
+test.pack.p1() test.pack.f2() test.pack.p3()
+CALL pack.p1('pack.f2 pack.f3');
+@track
+test.pack.p1() test.pack.f2() test.pack.f3()
+DO pack.f1('pack.p2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.p3()
+DO pack.f1('pack.p2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.f3()
+DO pack.f1('pack.f2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.p3()
+DO pack.f1('pack.f2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.f3()
+# pack.routine -> pack.routine -> [pack.]routine
+CALL pack.p1('pack.p2 p3');
+@track
+test.pack.p1() test.pack.p2() test.pack.p3()
+CALL pack.p1('pack.p2 f3');
+@track
+test.pack.p1() test.pack.p2() test.pack.f3()
+CALL pack.p1('pack.f2 p3');
+@track
+test.pack.p1() test.pack.f2() test.pack.p3()
+CALL pack.p1('pack.f2 f3');
+@track
+test.pack.p1() test.pack.f2() test.pack.f3()
+DO pack.f1('pack.p2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.p3()
+DO pack.f1('pack.p2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pack.f3()
+DO pack.f1('pack.f2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.p3()
+DO pack.f1('pack.f2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pack.f3()
+# pack.routine -> pack.routine -> test.routine
+CALL pack.p1('pack.p2 test.p3');
+@track
+test.pack.p1() test.pack.p2() test.p3()
+CALL pack.p1('pack.p2 test.f3');
+@track
+test.pack.p1() test.pack.p2() test.f3()
+CALL pack.p1('pack.f2 test.p3');
+@track
+test.pack.p1() test.pack.f2() test.p3()
+CALL pack.p1('pack.f2 test.f3');
+@track
+test.pack.p1() test.pack.f2() test.f3()
+DO pack.f1('pack.p2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.p3()
+DO pack.f1('pack.p2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.f3()
+DO pack.f1('pack.f2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.p3()
+DO pack.f1('pack.f2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.f3()
+# pack.routine -> pack.routine -> [test.]routine
+CALL pack.p1('pack.p2 pp2');
+@track
+test.pack.p1() test.pack.p2() test.pp2()
+CALL pack.p1('pack.p2 ff2');
+@track
+test.pack.p1() test.pack.p2() test.ff2()
+CALL pack.p1('pack.f2 pp2');
+@track
+test.pack.p1() test.pack.f2() test.pp2()
+CALL pack.p1('pack.f2 ff2');
+@track
+test.pack.p1() test.pack.f2() test.ff2()
+DO pack.f1('pack.p2 pp2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.pp2()
+DO pack.f1('pack.p2 ff2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.p2() test.ff2()
+DO pack.f1('pack.f2 pp2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.pp2()
+DO pack.f1('pack.f2 ff2');
+Warnings:
+Warning	1642	test.pack.f1() test.pack.f2() test.ff2()
+#
+# Qualified_package_routine -> Qualified_database_routine
+#
+pack.routine -> test.routine -> pack.routine
+CALL pack.p1('test.pp2 pack.p3');
+@track
+test.pack.p1() test.pp2() test.pack.p3()
+CALL pack.p1('test.pp2 pack.f3');
+@track
+test.pack.p1() test.pp2() test.pack.f3()
+CALL pack.p1('test.ff2 pack.p3');
+@track
+test.pack.p1() test.ff2() test.pack.p3()
+CALL pack.p1('test.ff2 pack.f3');
+@track
+test.pack.p1() test.ff2() test.pack.f3()
+DO pack.f1('test.pp2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.pack.p3()
+DO pack.f1('test.pp2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.pack.f3()
+DO pack.f1('test.ff2 pack.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.pack.p3()
+DO pack.f1('test.ff2 pack.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.pack.f3()
+pack.routine -> test.routine -> test.routine
+CALL pack.p1('test.pp2 test.p3');
+@track
+test.pack.p1() test.pp2() test.p3()
+CALL pack.p1('test.pp2 test.f3');
+@track
+test.pack.p1() test.pp2() test.f3()
+CALL pack.p1('test.ff2 test.p3');
+@track
+test.pack.p1() test.ff2() test.p3()
+CALL pack.p1('test.ff2 test.f3');
+@track
+test.pack.p1() test.ff2() test.f3()
+DO pack.f1('test.pp2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.p3()
+DO pack.f1('test.pp2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.f3()
+DO pack.f1('test.ff2 test.p3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.p3()
+DO pack.f1('test.ff2 test.f3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.f3()
+pack.routine -> test.routine -> [test.]routine
+CALL pack.p1('test.pp2 p3');
+@track
+test.pack.p1() test.pp2() test.p3()
+CALL pack.p1('test.pp2 f3');
+@track
+test.pack.p1() test.pp2() test.f3()
+CALL pack.p1('test.ff2 p3');
+@track
+test.pack.p1() test.ff2() test.p3()
+CALL pack.p1('test.ff2 f3');
+@track
+test.pack.p1() test.ff2() test.f3()
+DO pack.f1('test.pp2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.p3()
+DO pack.f1('test.pp2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.pp2() test.f3()
+DO pack.f1('test.ff2 p3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.p3()
+DO pack.f1('test.ff2 f3');
+Warnings:
+Warning	1642	test.pack.f1() test.ff2() test.f3()
+# Longer chains
+CALL pack.p1('p2 f2 p2 test.pp2 test.ff2 pack.p3');
+@track
+test.pack.p1() test.pack.p2() test.pack.f2() test.pack.p2() test.pp2() test.ff2() test.pack.p3()
+CALL pack.p1('p2 test.pp2 pack.p2 pack.f2 test.ff2 pack.p3');
+@track
+test.pack.p1() test.pack.p2() test.pp2() test.pack.p2() test.pack.f2() test.ff2() test.pack.p3()
+DROP PACKAGE pack;
+DROP FUNCTION f3;
+DROP PROCEDURE p3;
+DROP FUNCTION ff2;
+DROP PROCEDURE pp2;

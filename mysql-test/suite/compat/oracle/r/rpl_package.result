@@ -1,0 +1,112 @@
+include/master-slave.inc
+[connection master]
+connection master;
+SET sql_mode=ORACLE;
+CREATE PACKAGE pack AS
+FUNCTION f1 RETURN INT;
+PROCEDURE p1;
+END;
+$$
+CREATE PACKAGE BODY pack AS
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END;
+PROCEDURE p1 AS
+BEGIN
+SELECT f1();
+END;
+END pack;
+$$
+connection slave;
+connection slave;
+SELECT * FROM mysql.proc WHERE db='test' AND name='pack';
+db	test
+name	pack
+type	PROCEDURE
+specific_name	pack
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	
+returns	
+body	AS BEGIN NULL; END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS BEGIN NULL; END
+SELECT * FROM mysql.proc WHERE db='test' AND name LIKE 'pack.%';
+db	test
+name	pack.f1
+type	FUNCTION
+specific_name	pack.f1
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	
+returns	int(11)
+body	AS
+BEGIN
+RETURN 10;
+END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS
+BEGIN
+RETURN 10;
+END
+db	test
+name	pack.p1
+type	PROCEDURE
+specific_name	pack.p1
+language	SQL
+sql_data_access	CONTAINS_SQL
+is_deterministic	NO
+security_type	DEFINER
+param_list	
+returns	
+body	AS
+BEGIN
+SELECT f1();
+END
+definer	root@localhost
+created	#
+modified	#
+sql_mode	PIPES_AS_CONCAT,ANSI_QUOTES,IGNORE_SPACE,ORACLE,NO_KEY_OPTIONS,NO_TABLE_OPTIONS,NO_FIELD_OPTIONS,NO_AUTO_CREATE_USER
+comment	
+character_set_client	latin1
+collation_connection	latin1_swedish_ci
+db_collation	latin1_swedish_ci
+body_utf8	AS
+BEGIN
+SELECT f1();
+END
+SET @@sql_mode=ORACLE;
+SELECT pack.f1();
+pack.f1()
+10
+CALL pack.p1();
+f1()
+10
+SET @@sql_mode=DEFAULT;
+connection master;
+DROP PACKAGE pack;
+connection slave;
+connection slave;
+SELECT COUNT(*) FROM mysql.proc WHERE db='test' AND name='pack';
+COUNT(*)
+0
+include/rpl_end.inc

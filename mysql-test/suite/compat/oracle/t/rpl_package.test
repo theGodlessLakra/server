@@ -1,0 +1,50 @@
+--source include/master-slave.inc
+
+connection master;
+
+SET sql_mode=ORACLE;
+DELIMITER $$;
+CREATE PACKAGE pack AS
+  FUNCTION f1 RETURN INT;
+  PROCEDURE p1;
+END;
+$$
+DELIMITER ;$$
+
+DELIMITER $$;
+CREATE PACKAGE BODY pack AS
+  FUNCTION f1 RETURN INT AS
+  BEGIN
+    RETURN 10;
+  END;
+  PROCEDURE p1 AS
+  BEGIN
+    SELECT f1();
+  END;
+END pack;
+$$
+DELIMITER ;$$
+
+sync_slave_with_master;
+connection slave;
+--vertical_results
+--replace_column 13 # 14 #
+SELECT * FROM mysql.proc WHERE db='test' AND name='pack';
+--replace_column 13 # 14 #
+SELECT * FROM mysql.proc WHERE db='test' AND name LIKE 'pack.%';
+--horizontal_results
+
+SET @@sql_mode=ORACLE;
+SELECT pack.f1();
+CALL pack.p1();
+SET @@sql_mode=DEFAULT;
+
+connection master;
+DROP PACKAGE pack;
+
+sync_slave_with_master;
+connection slave;
+SELECT COUNT(*) FROM mysql.proc WHERE db='test' AND name='pack';
+
+
+--source include/rpl_end.inc

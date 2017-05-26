@@ -813,6 +813,22 @@ void lex_end_stage1(LEX *lex)
     lex->sphead= NULL;
   }
 
+  if (lex->package_body)
+  {
+    /*
+      Cleanup package_body only if we're cleaning up the top level LEX
+      corresponging to the "CREATE PACKAGE [BODY]" statement.
+      Otherwise, we're cleaning up a package routine sublex corresponding to a
+      package PROCEDURE/FUNCTION definition, e.g. in Package_body::cleanup().
+      The top-level LEX::package_body and the sub-LEX::package_body point to
+      the same Package_body instance, it should be left intact at this point.
+      It will be cleaned up later, during cleanup for the top-level LEX.
+    */
+    if (lex->package_body->m_top_level_lex == lex)
+      lex->package_body->cleanup();
+    lex->package_body= NULL;
+  }
+
   DBUG_VOID_RETURN;
 }
 
@@ -839,6 +855,18 @@ Yacc_state::~Yacc_state()
     my_free(yacc_yyvs);
   }
 }
+
+
+void Package_body::cleanup()
+{
+  List_iterator<LEX> it(m_lex_list);
+  for (LEX *lex; (lex= it++); )
+  {
+    lex_end(lex);
+    delete lex;
+  }
+}
+
 
 static int find_keyword(Lex_input_stream *lip, uint len, bool function)
 {
@@ -2918,6 +2946,20 @@ void LEX::cleanup_lex_after_parse_error(THD *thd)
     delete thd->lex->sphead;
     thd->lex->sphead= NULL;
   }
+  if (thd->lex->package_body)
+  {
+    /*
+      If a syntax error happened inside a package routine definition,
+      then thd->lex points to the routine sublex. We need to restore to
+      the top level LEX.
+      No needs to cleanup the current sub-lex: it's referenced from
+      package_body and will be cleaned during Package_body::cleanup().
+    */
+    LEX *top_level_lex= thd->lex->package_body->m_top_level_lex;
+    DBUG_ASSERT(top_level_lex);
+    DBUG_ASSERT(thd->lex->package_body == top_level_lex->package_body);
+    thd->lex= top_level_lex;
+  }
 }
 
 /*
@@ -3005,6 +3047,7 @@ void Query_tables_list::destroy_query_tables_list()
 
 LEX::LEX()
   : explain(NULL),
+    package_body(0),
     result(0), arena_for_set_stmt(0), mem_root_for_set_stmt(0),
     option_type(OPT_DEFAULT), context_analysis_only(0), sphead(0),
     is_lex_started(0), limit_rows_examined_cnt(ULONGLONG_MAX)

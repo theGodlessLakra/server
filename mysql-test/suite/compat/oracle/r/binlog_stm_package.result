@@ -1,0 +1,53 @@
+SET sql_mode=ORACLE;
+CREATE PACKAGE p1 AS
+PROCEDURE p1;
+FUNCTION f1 RETURN INT;
+END;
+$$
+CREATE PACKAGE IF NOT EXISTS p1 AS
+PROCEDURE p1;
+FUNCTION f1 RETURN INT;
+END;
+$$
+Warnings:
+Note	1304	PACKAGE p1 already exists
+CREATE PACKAGE BODY p1 AS
+PROCEDURE p1 AS
+BEGIN
+NULL;
+END;
+FUNCTION f1 RETURN INT AS
+BEGIN
+RETURN 10;
+END;
+END;
+$$
+DROP PACKAGE BODY p1;
+DROP PACKAGE p1;
+DROP PACKAGE IF EXISTS p1;
+Warnings:
+Note	1305	PACKAGE test.p1 does not exist
+include/show_binlog_events.inc
+Log_name	Pos	Event_type	Server_id	End_log_pos	Info
+master-bin.000001	#	Gtid	#	#	GTID #-#-#
+master-bin.000001	#	Query	#	#	use `test`; CREATE PACKAGE `p1` AS END;
+master-bin.000001	#	Gtid	#	#	GTID #-#-#
+master-bin.000001	#	Query	#	#	use `test`; CREATE PACKAGE IF NOT EXISTS `p1` AS END;
+master-bin.000001	#	Gtid	#	#	GTID #-#-#
+master-bin.000001	#	Query	#	#	use `test`; CREATE DEFINER="root"@"localhost" PROCEDURE "p1.p1"()
+AS
+BEGIN
+NULL;
+END
+master-bin.000001	#	Gtid	#	#	GTID #-#-#
+master-bin.000001	#	Query	#	#	use `test`; CREATE DEFINER="root"@"localhost" FUNCTION "p1.f1"() RETURN int(11)
+AS
+BEGIN
+RETURN 10;
+END
+master-bin.000001	#	Gtid	#	#	GTID #-#-#
+master-bin.000001	#	Query	#	#	use `test`; DROP PACKAGE BODY p1
+master-bin.000001	#	Gtid	#	#	GTID #-#-#
+master-bin.000001	#	Query	#	#	use `test`; DROP PACKAGE p1
+master-bin.000001	#	Gtid	#	#	GTID #-#-#
+master-bin.000001	#	Query	#	#	use `test`; DROP PACKAGE IF EXISTS p1
