@@ -1980,4 +1980,21 @@ void prot_store_ids(THD *thd, DYNAMIC_ARRAY *ids)
   return;
 }
 
+bool Master_info_index::flush_all_relay_logs()
+{
+ for (uint i=0; i < master_info_hash.records; i++)
+ {
+   Master_info *mi;
+   mi= (Master_info *)my_hash_element(&master_info_hash, i);
+   mysql_mutex_lock(&mi->data_lock);
+   if (rotate_relay_log(mi))
+   {
+      mysql_mutex_unlock(&mi->data_lock);
+      return true;
+   }
+   mysql_mutex_unlock(&mi->data_lock);
+ }
+ return false;
+}
+
 #endif /* HAVE_REPLICATION */

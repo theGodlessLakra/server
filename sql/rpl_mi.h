@@ -354,6 +354,7 @@ public:
   bool start_all_slaves(THD *thd);
   bool stop_all_slaves(THD *thd);
   void free_connections();
+  bool flush_all_relay_logs();
 };
 
 
