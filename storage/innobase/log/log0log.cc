@@ -561,8 +561,7 @@ log_group_get_capacity(
 	/* The lsn parameters are updated while holding both the mutexes
 	and it is ok to have either of them while reading */
 	ut_ad(log_mutex_own() || log_write_mutex_own());
-
-	return((group->file_size - LOG_FILE_HDR_SIZE) * group->n_files);
+	return group->capacity();
 }
 
 /******************************************************//**

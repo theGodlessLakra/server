@@ -2,7 +2,7 @@
 
 Copyright (c) 1995, 2017, Oracle and/or its affiliates. All rights reserved.
 Copyright (c) 2009, Google Inc.
-Copyright (c) 2017, MariaDB Corporation. All Rights Reserved.
+Copyright (c) 2017, MariaDB Corporation.
 
 Portions of this file contain modifications contributed and copyrighted by
 Google, Inc. Those modifications are gratefully acknowledged and are described
@@ -39,6 +39,7 @@ Created 12/9/1995 Heikki Tuuri
 #include "sync0rw.h"
 #include "log0types.h"
 #include "os0event.h"
+#include "os0file.h"
 
 /** Redo log group */
 struct log_group_t;
@@ -376,6 +377,7 @@ log_block_init(
 /*===========*/
 	byte*	log_block,	/*!< in: pointer to the log buffer */
 	lsn_t	lsn);		/*!< in: lsn within the log block */
+
 /************************************************************//**
 Converts a lsn to a log block number.
 @return log block number, it is > 0 and <= 1G */
@@ -587,6 +589,12 @@ struct log_group_t{
 	bool is_encrypted() const
 	{
 		return((format & LOG_HEADER_FORMAT_ENCRYPTED) != 0);
+	}
+
+	/** @return capacity in bytes */
+	inline lsn_t capacity() const
+	{
+		return((file_size - LOG_FILE_HDR_SIZE) * n_files);
 	}
 };
 

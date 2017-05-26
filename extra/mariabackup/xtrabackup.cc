@@ -2527,7 +2527,7 @@ xtrabackup_scan_log_recs(
 			ulint blocks_in_group;
 
 			blocks_in_group = log_block_convert_lsn_to_no(
-				log_group_get_capacity(group)) - 1;
+				group->capacity()) - 1;
 
 			if ((no < scanned_no &&
 			    ((scanned_no - no) % blocks_in_group) == 0) ||
@@ -2635,8 +2635,7 @@ xtrabackup_scan_log_recs(
 	}
 
 	if (srv_encrypt_log) {
-		log_encrypt_before_write(scanned_checkpoint_no,
-			log_sys->buf, write_size);
+		log_crypt(log_sys->buf, write_size);
 	}
 
 	if (ds_write(dst_log_file, log_sys->buf, write_size)) {

@@ -1,6 +1,7 @@
 /*****************************************************************************
 
 Copyright (c) 1995, 2015, Oracle and/or its affiliates. All Rights Reserved.
+Copyright (c) 2017, MariaDB Corporation.
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -23,7 +24,6 @@ Database log
 Created 12/9/1995 Heikki Tuuri
 *******************************************************/
 
-#include "os0file.h"
 #include "mach0data.h"
 #include "srv0mon.h"
 #include "srv0srv.h"
