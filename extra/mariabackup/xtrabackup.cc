@@ -518,7 +518,6 @@ enum options_xtrabackup
   OPT_INNODB_LOG_BUFFER_SIZE,
   OPT_INNODB_LOG_FILE_SIZE,
   OPT_INNODB_LOG_FILES_IN_GROUP,
-  OPT_INNODB_MIRRORED_LOG_GROUPS,
   OPT_INNODB_OPEN_FILES,
   OPT_INNODB_SYNC_SPIN_LOOPS,
   OPT_INNODB_THREAD_CONCURRENCY,
@@ -2395,96 +2394,6 @@ skip:
 	return(FALSE);
 }
 
-static
-void
-xtrabackup_choose_lsn_offset(lsn_t start_lsn)
-{
-#if SUPPORT_PERCONA_5_5
-	ulint no, alt_no, expected_no;
-	ulint blocks_in_group;
-	lsn_t tmp_offset, end_lsn;
-	int lsn_chosen = 0;
-	log_group_t *group;
-
-	start_lsn = ut_uint64_align_down(start_lsn, OS_FILE_LOG_BLOCK_SIZE);
-	end_lsn = start_lsn + RECV_SCAN_SIZE;
-
-	group = UT_LIST_GET_FIRST(log_sys->log_groups);
-
-	if (mysql_server_version < 50500 || mysql_server_version > 50600) {
-		/* only make sense for Percona Server 5.5 */
-		return;
-	}
-
-	if (server_flavor == FLAVOR_PERCONA_SERVER) {
-		/* it is Percona Server 5.5 */
-		group->alt_offset_chosen = true;
-		group->lsn_offset = group->lsn_offset_alt;
-		return;
-	}
-
-	if (group->lsn_offset_alt == group->lsn_offset ||
-	    group->lsn_offset_alt == (lsn_t) -1) {
-		/* we have only one option */
-		return;
-	}
-
-	no = alt_no = (ulint) -1;
-	lsn_chosen = 0;
-
-	blocks_in_group = log_block_convert_lsn_to_no(
-		log_group_get_capacity(group)) - 1;
-
-	/* read log block number from usual offset */
-	if (group->lsn_offset < group->file_size * group->n_files &&
-	    (log_group_calc_lsn_offset(start_lsn, group) %
-	     UNIV_PAGE_SIZE) % OS_MIN_LOG_BLOCK_SIZE == 0) {
-		log_group_read_log_seg(LOG_RECOVER, log_sys->buf,
-				       group, start_lsn, end_lsn);
-		no = log_block_get_hdr_no(log_sys->buf);
-	}
-
-	/* read log block number from Percona Server 5.5 offset */
-	tmp_offset = group->lsn_offset;
-	group->lsn_offset = group->lsn_offset_alt;
-
-	if (group->lsn_offset < group->file_size * group->n_files &&
-	    (log_group_calc_lsn_offset(start_lsn, group) %
-	     UNIV_PAGE_SIZE) % OS_MIN_LOG_BLOCK_SIZE == 0) {
-		log_group_read_log_seg(LOG_RECOVER, log_sys->buf,
-				       group, start_lsn, end_lsn);
-		alt_no = log_block_get_hdr_no(log_sys->buf);
-	}
-
-	expected_no = log_block_convert_lsn_to_no(start_lsn);
-
-	ut_a(!(no == expected_no && alt_no == expected_no));
-
-	group->lsn_offset = tmp_offset;
-
-	if ((no <= expected_no &&
-		((expected_no - no) % blocks_in_group) == 0) ||
-	    ((expected_no | 0x40000000UL) - no) % blocks_in_group == 0) {
-		/* default offset looks ok */
-		++lsn_chosen;
-	}
-
-	if ((alt_no <= expected_no &&
-		((expected_no - alt_no) % blocks_in_group) == 0) ||
-	    ((expected_no | 0x40000000UL) - alt_no) % blocks_in_group == 0) {
-		/* PS 5.5 style offset looks ok */
-		++lsn_chosen;
-		group->alt_offset_chosen = true;
-		group->lsn_offset = group->lsn_offset_alt;
-	}
-
-	/* We are in trouble, because we can not make a
-	decision to choose one over the other. Die just
-	like a Buridan's ass */
-	ut_a(lsn_chosen == 1);
-#endif
-}
-
 extern ibool log_block_checksum_is_ok_or_old_format(const byte*	block);
 
 /*******************************************************//**
@@ -2651,8 +2560,6 @@ static my_bool
 xtrabackup_copy_logfile(lsn_t from_lsn, my_bool is_last)
 {
 	/* definition from recv_recovery_from_checkpoint_start() */
-	log_group_t*	group;
-	lsn_t		group_scanned_lsn;
 	lsn_t		contiguous_lsn;
 
 	ut_a(dst_log_file != NULL);
@@ -2662,65 +2569,50 @@ xtrabackup_copy_logfile(lsn_t from_lsn, my_bool is_last)
 
 	/* TODO: We must check the contiguous_lsn still exists in log file.. */
 
-	group = UT_LIST_GET_FIRST(log_sys->log_groups);
+	bool	finished;
+	lsn_t	start_lsn;
+	lsn_t	end_lsn;
 
-	while (group) {
-		bool	finished;
-		lsn_t	start_lsn;
-		lsn_t	end_lsn;
+	/* reference recv_group_scan_log_recs() */
 
-		/* reference recv_group_scan_log_recs() */
-		finished = false;
+	start_lsn = contiguous_lsn;
 
-		start_lsn = contiguous_lsn;
+	do {
+		end_lsn = start_lsn + RECV_SCAN_SIZE;
 
-		while (!finished) {
+		xtrabackup_io_throttling();
 
-			end_lsn = start_lsn + RECV_SCAN_SIZE;
+		log_mutex_enter();
 
-			xtrabackup_io_throttling();
+		log_group_read_log_seg(log_sys->buf,
+				       &log_sys->log, start_lsn, end_lsn);
 
-			mutex_enter(&log_sys->mutex);
+		bool success = xtrabackup_scan_log_recs(
+			&log_sys->log, is_last,
+			start_lsn, &contiguous_lsn,
+			&log_sys->log.scanned_lsn,
+			&finished);
 
-			log_group_read_log_seg(log_sys->buf,
-					       group, start_lsn, end_lsn);
+		log_mutex_exit();
 
-			if (!xtrabackup_scan_log_recs(group, is_last,
-				start_lsn, &contiguous_lsn, &group_scanned_lsn,
-				&finished)) {
-				goto error;
-			}
-
-			mutex_exit(&log_sys->mutex);
-
-			start_lsn = end_lsn;
+		if (!success) {
+			ds_close(dst_log_file);
+			msg("xtrabackup: Error: xtrabackup_copy_logfile()"
+			    " failed.\n");
+			return(TRUE);
 		}
 
-		group->scanned_lsn = group_scanned_lsn;
+		start_lsn = end_lsn;
+	} while (!finished);
 
-		msg_ts(">> log scanned up to (" LSN_PF ")\n",
-		       group->scanned_lsn);
+	msg_ts(">> log scanned up to (" LSN_PF ")\n",
+	       log_sys->log.scanned_lsn);
 
-		group = UT_LIST_GET_NEXT(log_groups, group);
+	/* update global variable*/
+	log_copy_scanned_lsn = log_sys->log.scanned_lsn;
 
-		/* update global variable*/
-		log_copy_scanned_lsn = group_scanned_lsn;
-
-		/* innodb_mirrored_log_groups must be 1, no other groups */
-		ut_a(group == NULL);
-
-		debug_sync_point("xtrabackup_copy_logfile_pause");
-
-	}
-
-
+	debug_sync_point("xtrabackup_copy_logfile_pause");
 	return(FALSE);
-
-error:
-	mutex_exit(&log_sys->mutex);
-	ds_close(dst_log_file);
-	msg("xtrabackup: Error: xtrabackup_copy_logfile() failed.\n");
-	return(TRUE);
 }
 
 static
@@ -3508,7 +3400,6 @@ open_or_create_log_file(
 	ibool	log_file_has_been_opened,/*!< in: TRUE if a log file has been
 					opened before: then it is an error
 					to try to create another log file */
-	ulint	k,			/*!< in: log group number */
 	ulint	i)			/*!< in: log file number in group */
 {
 	ibool	ret;
@@ -3518,8 +3409,6 @@ open_or_create_log_file(
 
 	UT_NOT_USED(create_new_db);
 	UT_NOT_USED(log_file_has_been_opened);
-	UT_NOT_USED(k);
-	ut_ad(k == 0);
 
 	*log_file_created = FALSE;
 
@@ -3567,18 +3456,14 @@ open_or_create_log_file(
 		which is for this log group */
 
 		fil_space_create(name,
-				 2 * k + SRV_LOG_SPACE_FIRST_ID, 0, FIL_TYPE_LOG, 0, 0);
+				 SRV_LOG_SPACE_FIRST_ID, 0, FIL_TYPE_LOG, 0, 0);
+		log_init(srv_n_log_files, srv_log_file_size * UNIV_PAGE_SIZE);
 	}
 
 	ut_a(fil_validate());
 
 	ut_a(fil_node_create(name, (ulint)srv_log_file_size,
-			     2 * k + SRV_LOG_SPACE_FIRST_ID, FALSE));
-	if (i == 0) {
-		log_group_init(k, srv_n_log_files,
-			       srv_log_file_size * UNIV_PAGE_SIZE,
-			       2 * k + SRV_LOG_SPACE_FIRST_ID);
-	}
+			     SRV_LOG_SPACE_FIRST_ID, FALSE));
 
 	return(DB_SUCCESS);
 }
@@ -3672,7 +3557,7 @@ xtrabackup_backup_func(void)
 	lsn_t			 latest_cp;
 	uint			 i;
 	uint			 count;
-	os_ib_mutex_t		 count_mutex;
+	pthread_mutex_t		 count_mutex;
 	data_thread_ctxt_t 	*data_threads;
 
 #ifdef USE_POSIX_FADVISE
@@ -3792,13 +3677,13 @@ xtrabackup_backup_func(void)
 
 	xb_fil_io_init();
 
-	log_init();
+	log_sys_init();
 
 	lock_sys_create(srv_lock_table_size);
 
 	for (i = 0; i < srv_n_log_files; i++) {
 		err = open_or_create_log_file(FALSE, &log_file_created,
-					      log_opened, 0, i);
+					      log_opened, i);
 		if (err != DB_SUCCESS) {
 
 			//return((int) err);
@@ -3965,10 +3850,6 @@ reread_log_header:
 				 &io_watching_thread_id);
 	}
 
-	mutex_enter(&log_sys->mutex);
-	xtrabackup_choose_lsn_offset(checkpoint_lsn_start);
-	mutex_exit(&log_sys->mutex);
-
 	/* copy log file by current position */
 	if(xtrabackup_copy_logfile(checkpoint_lsn_start, FALSE))
 		exit(EXIT_FAILURE);
@@ -4074,8 +3955,6 @@ reread_log_header:
 		}
 
 		log_group_read_checkpoint_info(max_cp_group, max_cp_field);
-
-		xtrabackup_choose_lsn_offset(checkpoint_lsn_start);
 
 		latest_cp = mach_read_from_8(log_sys->checkpoint_buf +
 					     LOG_CHECKPOINT_LSN);
