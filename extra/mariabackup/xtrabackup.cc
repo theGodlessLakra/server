@@ -198,8 +198,6 @@ ibool xtrabackup_compress = FALSE;
 uint xtrabackup_compress_threads;
 ulonglong xtrabackup_compress_chunk_size = 0;
 
-ulint xtrabackup_rebuild_threads = 1;
-
 /* sleep interval beetween log copy iterations in log copying thread
 in milliseconds (default is 1 second) */
 ulint xtrabackup_log_copy_interval = 1000;
@@ -282,9 +280,6 @@ ulong	innobase_active_counter	= 0;
 
 
 static char *xtrabackup_debug_sync = NULL;
-
-my_bool xtrabackup_compact = FALSE;
-my_bool xtrabackup_rebuild_indexes = FALSE;
 
 my_bool xtrabackup_incremental_force_scan = FALSE;
 
@@ -693,23 +688,6 @@ struct my_option xb_client_options[] =
    "Size of working buffer(s) for compression threads in bytes. The default value is 64K.",
    (G_PTR*) &xtrabackup_compress_chunk_size, (G_PTR*) &xtrabackup_compress_chunk_size,
    0, GET_ULL, REQUIRED_ARG, (1 << 16), 1024, ULONGLONG_MAX, 0, 0, 0},
-
-  {"compact", OPT_XTRA_COMPACT,
-   "Create a compact backup by skipping secondary index pages.",
-   (G_PTR*) &xtrabackup_compact, (G_PTR*) &xtrabackup_compact,
-   0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-
-  {"rebuild_indexes", OPT_XTRA_REBUILD_INDEXES,
-   "Rebuild secondary indexes in InnoDB tables after applying the log. "
-   "Only has effect with --prepare.",
-   (G_PTR*) &xtrabackup_rebuild_indexes, (G_PTR*) &xtrabackup_rebuild_indexes,
-   0, GET_BOOL, NO_ARG, 0, 0, 0, 0, 0, 0},
-
-  {"rebuild_threads", OPT_XTRA_REBUILD_THREADS,
-   "Use this number of threads to rebuild indexes in a compact backup. "
-   "Only has effect with --prepare and --rebuild-indexes.",
-   (G_PTR*) &xtrabackup_rebuild_threads, (G_PTR*) &xtrabackup_rebuild_threads,
-   0, GET_UINT, REQUIRED_ARG, 1, 1, UINT_MAX, 0, 0, 0},
 
   {"incremental-force-scan", OPT_XTRA_INCREMENTAL_FORCE_SCAN,
    "Perform a full-scan incremental backup even in the presence of changed "
@@ -1834,13 +1812,11 @@ xtrabackup_print_metadata(char *buf, size_t buf_len)
 		 "from_lsn = " UINT64PF "\n"
 		 "to_lsn = " UINT64PF "\n"
 		 "last_lsn = " UINT64PF "\n"
-		 "compact = %d\n"
 		 "recover_binlog_info = %d\n",
 		 metadata_type,
 		 metadata_from_lsn,
 		 metadata_to_lsn,
 		 metadata_last_lsn,
-		 MY_TEST(false),
 		 MY_TEST(opt_binlog_info == BINLOG_INFO_LOCKLESS));
 }
 
