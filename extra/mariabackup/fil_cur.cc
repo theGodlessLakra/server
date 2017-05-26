@@ -161,9 +161,9 @@ xb_fil_cur_open(
 		sizeof(cursor->rel_path));
 
 	/* In the backup mode we should already have a tablespace handle created
-	by fil_load_single_table_tablespace() unless it is a system
+	by fil_ibd_load() unless it is a system
 	tablespace. Otherwise we open the file here. */
-	if (cursor->is_system || !srv_backup_mode || srv_close_files) {
+	if (cursor->is_system || !srv_backup_mode) {
 		node->handle =
 			os_file_create_simple_no_error_handling(0, node->name,
 								OS_FILE_OPEN,
@@ -328,8 +328,9 @@ read_retry:
 	cursor->buf_offset = offset;
 	cursor->buf_page_no = (ulint)(offset >> cursor->page_size_shift);
 
-	success = os_file_read(IORequest(IORequest::READ),cursor->file, cursor->buf, offset,
-			       (ulint)to_read);
+	IORequest request(IORequest::READ);
+	success = os_file_read(request ,cursor->file, cursor->buf, offset,
+			       (ulint) to_read);
 	if (!success) {
 		return(XB_FIL_CUR_ERROR);
 	}
@@ -347,6 +348,7 @@ read_retry:
 		bool checksum_ok = fil_space_verify_crypt_checksum(page, cursor->zip_size,space, (ulint)page_no);
 
 		if (!checksum_ok &&
+
 		    buf_page_is_corrupted(true, page, cursor->zip_size,space)) {
 
 			if (cursor->is_system &&

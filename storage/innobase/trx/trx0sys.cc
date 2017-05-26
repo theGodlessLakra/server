@@ -349,10 +349,11 @@ trx_sys_update_wsrep_checkpoint(
 
 }
 
-void
-trx_sys_read_wsrep_checkpoint(
-/*==========================*/
-	XID* xid)
+/** Read WSREP checkpoint XID from sys header.
+@param[out]	xid	WSREP XID
+@return	whether the checkpoint was present */
+bool
+trx_sys_read_wsrep_checkpoint(XID* xid)
 {
 	trx_sysf_t*	sys_header;
 	mtr_t		mtr;
@@ -373,7 +374,7 @@ trx_sys_read_wsrep_checkpoint(
 		xid->formatID = -1;
 		trx_sys_update_wsrep_checkpoint(xid, sys_header, &mtr);
 		mtr_commit(&mtr);
-		return;
+		return false;
 	}
 
 	xid->formatID = (int)mach_read_from_4(
@@ -390,6 +391,7 @@ trx_sys_read_wsrep_checkpoint(
 		  XIDDATASIZE);
 
 	mtr_commit(&mtr);
+	return true;
 }
 
 #endif /* WITH_WSREP */

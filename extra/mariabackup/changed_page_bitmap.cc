@@ -193,8 +193,10 @@ log_online_read_bitmap_page(
 	ut_a(bitmap_file->offset
 	     <= bitmap_file->size - MODIFIED_PAGE_BLOCK_SIZE);
 	ut_a(bitmap_file->offset % MODIFIED_PAGE_BLOCK_SIZE == 0);
-
-	success = os_file_read(IORequest(IORequest::READ),bitmap_file->file, page, bitmap_file->offset, MODIFIED_PAGE_BLOCK_SIZE);
+	IORequest request (IORequest::READ);
+	success = os_file_read(request,
+			       bitmap_file->file, page, bitmap_file->offset,
+			       MODIFIED_PAGE_BLOCK_SIZE);
 
 	if (UNIV_UNLIKELY(!success)) {
 

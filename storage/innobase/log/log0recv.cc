@@ -677,7 +677,6 @@ recv_sys_debug_free(void)
 @param[in]	start_lsn	read area start
 @param[in]	end_lsn		read area end
 @return	valid end_lsn */
-static
 lsn_t
 log_group_read_log_seg(
 	byte*			buf,

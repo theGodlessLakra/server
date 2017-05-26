@@ -540,7 +540,10 @@ datafile_read(datafile_cur_t *cursor)
 		return(XB_FIL_CUR_EOF);
 	}
 
-	success = os_file_read(IORequest(IORequest::READ),cursor->file, cursor->buf, cursor->buf_offset,
+	IORequest request (IORequest::READ);
+
+	success = os_file_read(request,
+			       cursor->file, cursor->buf, cursor->buf_offset,
 			       to_read);
 	if (!success) {
 		return(XB_FIL_CUR_ERROR);
@@ -1688,15 +1691,11 @@ copy_back()
 	}
 
 	srv_max_n_threads = 1000;
-	//os_sync_mutex = NULL;
-	ut_mem_init();
 	/* temporally dummy value to avoid crash */
 	srv_page_size_shift = 14;
 	srv_page_size = (1 << srv_page_size_shift);
-	os_sync_init();
-	sync_init();
+	sync_check_init();
 	os_io_init_simple();
-	mem_init(srv_mem_pool_size);
 	ut_crc32_init();
 
 	/* copy undo tablespaces */
@@ -1881,12 +1880,7 @@ cleanup:
 
 	ds_data = NULL;
 
-	//os_sync_free();
-	mem_close();
-	//os_sync_mutex = NULL;
-	ut_free_all_mem();
-	sync_close();
-	sync_initialized = FALSE;
+	sync_check_close();
 	return(ret);
 }
 
@@ -1982,9 +1976,9 @@ cleanup:
 
 	datadir_node_free(&node);
 
-	os_mutex_enter(ctxt->count_mutex);
+	pthread_mutex_lock(&ctxt->count_mutex);
 	--(*ctxt->count);
-	os_mutex_exit(ctxt->count_mutex);
+	pthread_mutex_unlock(&ctxt->count_mutex);
 
 	ctxt->ret = ret;
 
@@ -1999,10 +1993,7 @@ decrypt_decompress()
 	datadir_iter_t *it = NULL;
 
 	srv_max_n_threads = 1000;
-	//os_sync_mutex = NULL;
-	ut_mem_init();
-	os_sync_init();
-	sync_init();
+	sync_check_init();
 
 	/* cd to backup directory */
 	if (my_setwd(xtrabackup_target_dir, MYF(MY_WME)))
@@ -2031,11 +2022,7 @@ decrypt_decompress()
 
 	ds_data = NULL;
 
-	sync_close();
-	sync_initialized = FALSE;
-	//os_sync_free();
-	//os_sync_mutex = NULL;
-	ut_free_all_mem();
+	sync_check_close();
 
 	return(ret);
 }
