@@ -427,9 +427,9 @@ log_online_setup_bitmap_file_range(
 /****************************************************************//**
 Open a bitmap file for reading.
 
-@return TRUE if opened successfully */
+@return whether opened successfully */
 static
-ibool
+bool
 log_online_open_bitmap_file_read_only(
 /*==================================*/
 	const char*			name,		/*!<in: bitmap file
@@ -439,23 +439,21 @@ log_online_open_bitmap_file_read_only(
 	log_online_bitmap_file_t*	bitmap_file)	/*!<out: opened bitmap
 							file */
 {
-	ibool	success	= FALSE;
+	bool	success	= false;
 
 	xb_ad(name[0] != '\0');
 
 	ut_snprintf(bitmap_file->name, FN_REFLEN, "%s%s", srv_data_home, name);
-	bitmap_file->file
-		= os_file_create_simple_no_error_handling(0, bitmap_file->name,
-							  OS_FILE_OPEN,
-							  OS_FILE_READ_ONLY,
-							  &success,0);
+	bitmap_file->file = os_file_create_simple_no_error_handling(
+		0, bitmap_file->name,
+		OS_FILE_OPEN, OS_FILE_READ_ONLY, true, &success);
 	if (UNIV_UNLIKELY(!success)) {
 
 		/* Here and below assume that bitmap file names do not
 		contain apostrophes, thus no need for ut_print_filename(). */
 		msg("InnoDB: Warning: error opening the changed page "
 		    "bitmap \'%s\'\n", bitmap_file->name);
-		return FALSE;
+		return success;
 	}
 
 	bitmap_file->size = os_file_get_size(bitmap_file->file);
@@ -466,7 +464,7 @@ log_online_open_bitmap_file_read_only(
 	posix_fadvise(bitmap_file->file, 0, 0, POSIX_FADV_NOREUSE);
 #endif
 
-	return TRUE;
+	return success;
 }
 
 /****************************************************************//**

@@ -3584,7 +3584,7 @@ xtrabackup_backup_func(void)
 	srv_n_purge_threads = 1;
 	srv_read_only_mode = TRUE;
 
-	srv_backup_mode = TRUE;
+	srv_operation = SRV_OPERATION_BACKUP;
 	srv_close_files = (bool)xb_close_files;
 
 	if (srv_close_files)
@@ -4470,7 +4470,7 @@ xtrabackup_init_temp_log(void)
 	pfs_os_file_t	src_file;
 	char		src_path[FN_REFLEN];
 	char		dst_path[FN_REFLEN];
-	ibool		success;
+	bool		success;
 
 	ulint		field;
 	byte*		log_buf= (byte *)malloc(UNIV_PAGE_SIZE_MAX * 128); /* 2 MB */
@@ -4508,10 +4508,9 @@ xtrabackup_init_temp_log(void)
 	os_normalize_path(dst_path);
 	os_normalize_path(src_path);
 retry:
-	src_file = os_file_create_simple_no_error_handling(0, src_path,
-							   OS_FILE_OPEN,
-							   OS_FILE_READ_WRITE,
-							   &success,0);
+	src_file = os_file_create_simple_no_error_handling(
+		0, src_path,
+		OS_FILE_OPEN, OS_FILE_READ_WRITE, false, &success);
 	if (!success) {
 		/* The following call prints an error message */
 		os_file_get_last_error(TRUE);
@@ -4520,10 +4519,9 @@ retry:
 		    src_path);
 
 		/* check if ib_logfile0 may be xtrabackup_logfile */
-		src_file = os_file_create_simple_no_error_handling(0, dst_path,
-								   OS_FILE_OPEN,
-								   OS_FILE_READ_WRITE,
-								   &success,0);
+		src_file = os_file_create_simple_no_error_handling(
+			0, dst_path,
+			OS_FILE_OPEN, OS_FILE_READ_WRITE, false, &success);
 		if (!success) {
 			os_file_get_last_error(TRUE);
 			msg("  xtrabackup: Fatal error: cannot find %s.\n",
@@ -4785,9 +4783,9 @@ file. Code adopted from fil_create_new_single_table_tablespace with
 the main difference that only disk file is created without updating
 the InnoDB in-memory dictionary data structures.
 
-@return TRUE on success, FALSE on error.  */
+@return true on success, false on error.  */
 static
-ibool
+bool
 xb_space_create_file(
 /*==================*/
 	const char*	path,		/*!<in: path to tablespace */
@@ -4796,13 +4794,12 @@ xb_space_create_file(
 					flags */
 	pfs_os_file_t*	file)		/*!<out: file handle */
 {
-	ibool		ret;
+	bool		ret;
 	byte*		buf;
 	byte*		page;
 
-	*file = os_file_create_simple_no_error_handling(0, path, OS_FILE_CREATE,
-							OS_FILE_READ_WRITE,
-							&ret,0);
+	*file = os_file_create_simple_no_error_handling(
+		0, path, OS_FILE_CREATE, OS_FILE_READ_WRITE, false, &ret);
 	if (!ret) {
 		msg("xtrabackup: cannot create file %s\n", path);
 		return ret;
@@ -4885,7 +4882,7 @@ xb_delta_open_matching_space(
 {
 	char			dest_dir[FN_REFLEN];
 	char			dest_space_name[FN_REFLEN];
-	ibool			ok;
+	bool			ok;
 	fil_space_t*		fil_space;
 	pfs_os_file_t		file;
 	ulint			tablespace_flags;
@@ -5023,10 +5020,9 @@ xb_delta_open_matching_space(
 found:
 	/* open the file and return it's handle */
 
-	file = os_file_create_simple_no_error_handling(0, real_name,
-						       OS_FILE_OPEN,
-						       OS_FILE_READ_WRITE,
-						       &ok,0);
+	file = os_file_create_simple_no_error_handling(
+		0, real_name,
+		OS_FILE_OPEN, OS_FILE_READ_WRITE, false, &ok);
 
 	if (ok) {
 		*success = TRUE;
@@ -5112,10 +5108,9 @@ xtrabackup_apply_delta(
 		goto error;
 	}
 
-	src_file = os_file_create_simple_no_error_handling(0, src_path,
-							   OS_FILE_OPEN,
-							   OS_FILE_READ_WRITE,
-							   &success,0);
+	src_file = os_file_create_simple_no_error_handling(
+		0, src_path,
+		OS_FILE_OPEN, OS_FILE_READ_WRITE, false, &success);
 	if (!success) {
 		os_file_get_last_error(TRUE);
 		msg("xtrabackup: error: cannot open %s\n", src_path);
@@ -5429,7 +5424,7 @@ xtrabackup_close_temp_log(my_bool clear_flag)
 	pfs_os_file_t	src_file;
 	char	src_path[FN_REFLEN];
 	char	dst_path[FN_REFLEN];
-	ibool	success;
+	bool	success;
 	byte	log_buf[UNIV_PAGE_SIZE_MAX];
 
 	if (!xtrabackup_logfile_is_renamed)
@@ -5459,10 +5454,9 @@ xtrabackup_close_temp_log(my_bool clear_flag)
 		return(FALSE);
 
 	/* clear LOG_FILE_WAS_CREATED_BY_HOT_BACKUP field */
-	src_file = os_file_create_simple_no_error_handling(0, src_path,
-							   OS_FILE_OPEN,
-							   OS_FILE_READ_WRITE,
-							   &success,0);
+	src_file = os_file_create_simple_no_error_handling(
+		0, src_path,
+		OS_FILE_OPEN, OS_FILE_READ_WRITE, false, &success);
 	if (!success) {
 		goto error;
 	}

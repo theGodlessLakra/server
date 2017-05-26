@@ -140,7 +140,7 @@ xb_fil_cur_open(
 	ulint	page_size;
 	ulint	page_size_shift;
 	ulint	zip_size;
-	ibool	success;
+	bool	success;
 
 	/* Initialize these first so xb_fil_cur_close() handles them correctly
 	in case of error */
@@ -163,12 +163,11 @@ xb_fil_cur_open(
 	/* In the backup mode we should already have a tablespace handle created
 	by fil_ibd_load() unless it is a system
 	tablespace. Otherwise we open the file here. */
-	if (cursor->is_system || !srv_backup_mode) {
-		node->handle =
-			os_file_create_simple_no_error_handling(0, node->name,
-								OS_FILE_OPEN,
-								OS_FILE_READ_ONLY,
-								&success,0);
+	if (cursor->is_system || srv_operation == SRV_OPERATION_RESTORE) {
+		node->handle = os_file_create_simple_no_error_handling(
+			0, node->name,
+			OS_FILE_OPEN,
+			OS_FILE_READ_ALLOW_DELETE, true, &success);
 		if (!success) {
 			/* The following call prints an error message */
 			os_file_get_last_error(TRUE);

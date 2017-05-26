@@ -3806,6 +3806,7 @@ os_file_create_simple_func(
 
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_SILENT));
 	ut_a(!(create_mode & OS_FILE_ON_ERROR_NO_EXIT));
+	ut_ad(srv_operation == SRV_OPERATION_NORMAL);
 
 	if (create_mode == OS_FILE_OPEN) {
 
@@ -4129,7 +4130,9 @@ os_file_create_func(
 	);
 
 	DWORD		create_flag;
-	DWORD		share_mode = FILE_SHARE_READ;
+	DWORD		share_mode = srv_operation == SRV_OPERATION_BACKUP
+		? FILE_SHARE_READ | FILE_SHARE_WRITE
+		: FILE_SHARE_READ;
 
 	if (create_mode != OS_FILE_OPEN && create_mode != OS_FILE_OPEN_RAW) {
 		WAIT_ALLOW_WRITES();
@@ -4141,8 +4144,7 @@ os_file_create_func(
 	on_error_silent = create_mode & OS_FILE_ON_ERROR_SILENT
 		? true : false;
 
-	create_mode &= ~OS_FILE_ON_ERROR_NO_EXIT;
-	create_mode &= ~OS_FILE_ON_ERROR_SILENT;
+	create_mode &= ~(OS_FILE_ON_ERROR_NO_EXIT | OS_FILE_ON_ERROR_SILENT);
 
 	if (create_mode == OS_FILE_OPEN_RAW) {
 

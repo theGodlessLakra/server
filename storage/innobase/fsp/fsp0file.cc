@@ -336,10 +336,16 @@ Datafile::read_first_page(bool read_only_mode)
 
 		} else {
 
-			ib::error()
-				<< "Cannot read first page of '"
-				<< m_filepath << "' "
-				<< ut_strerr(err);
+			switch (srv_operation) {
+			case SRV_OPERATION_BACKUP:
+				break;
+			case SRV_OPERATION_NORMAL:
+			case SRV_OPERATION_RESTORE:
+				ib::error()
+					<< "Cannot read first page of '"
+					<< m_filepath << "' "
+					<< ut_strerr(err);
+			}
 			break;
 		}
 	}

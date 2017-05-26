@@ -476,7 +476,7 @@ static
 bool
 datafile_open(const char *file, datafile_cur_t *cursor, uint thread_n)
 {
-	ulint		success;
+	bool		success;
 
 	memset(cursor, 0, sizeof(datafile_cur_t));
 
@@ -490,11 +490,9 @@ datafile_open(const char *file, datafile_cur_t *cursor, uint thread_n)
 		xb_get_relative_path(cursor->abs_path, FALSE),
 		sizeof(cursor->rel_path));
 
-	cursor->file = os_file_create_simple_no_error_handling(0,
-							cursor->abs_path,
-							OS_FILE_OPEN,
-							OS_FILE_READ_ONLY,
-							&success, 0);
+	cursor->file = os_file_create_simple_no_error_handling(
+		0, cursor->abs_path,
+		OS_FILE_OPEN, OS_FILE_READ_ALLOW_DELETE, true, &success);
 	if (!success) {
 		/* The following call prints an error message */
 		os_file_get_last_error(TRUE);
@@ -528,7 +526,6 @@ static
 xb_fil_cur_result_t
 datafile_read(datafile_cur_t *cursor)
 {
-	ulint		success;
 	ulint		to_read;
 
 	xtrabackup_io_throttling();
@@ -542,10 +539,9 @@ datafile_read(datafile_cur_t *cursor)
 
 	IORequest request (IORequest::READ);
 
-	success = os_file_read(request,
-			       cursor->file, cursor->buf, cursor->buf_offset,
-			       to_read);
-	if (!success) {
+	if (!os_file_read(request,
+			  cursor->file, cursor->buf, cursor->buf_offset,
+			  to_read)) {
 		return(XB_FIL_CUR_ERROR);
 	}
 
