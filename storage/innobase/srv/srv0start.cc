@@ -2704,6 +2704,15 @@ files_checked:
 		os_event_set(buf_flush_event);
 
 		if (srv_use_mtflush) {
+
+#ifdef HAVE_LIBNUMA
+			if (srv_numa_enable) {
+				ulint remainder = srv_mtflush_threads % srv_buf_pool_instances;
+				if (remainder != 0) {
+					srv_mtflush_threads + srv_buf_pool_instances - remainder;
+				}
+			}
+#endif
 			/* Start multi-threaded flush threads */
 			mtflush_ctx = buf_mtflu_handler_init(
 				srv_mtflush_threads,

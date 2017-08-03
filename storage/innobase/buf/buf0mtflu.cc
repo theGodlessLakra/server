@@ -274,7 +274,8 @@ mtflush_service_io(
 /*===============*/
 	thread_sync_t*	mtflush_io,	/*!< inout: multi-threaded flush
 					syncronization data */
-	thread_data_t*  thread_data)    /* Thread status data */
+	thread_data_t*  thread_data,    /* Thread status data */
+	ulint			node_id;
 {
 	wrk_t		*work_item = NULL;
 	ulint		n_flushed=0;
@@ -354,6 +355,16 @@ DECLARE_THREAD(mtflush_io_thread)(void* arg)
 	thread_data_t *this_thread_data = NULL;
 	ulint i;
 
+	ulint			node;
+	static ulint	static_node = 0;
+
+#ifdef HAVE_LIBNUMA
+	if (srv_numa_enable) {
+		node = srv_allowed_nodes[static_node++/srv_buf_pool_instances];
+		mysql_bind_thread_to_node(node);
+	}
+#endif // HAVE_LIBNUMA
+
 	/* Find correct slot for this thread */
 	mutex_enter(&(mtflush_io->thread_global_mtx));
 	for(i=0; i < mtflush_io->n_threads; i ++) {
@@ -375,7 +386,7 @@ DECLARE_THREAD(mtflush_io_thread)(void* arg)
  					ib_wqueue_len(mtflush_io->wr_cq));
 #endif /* UNIV_MTFLUSH_DEBUG */
 
-		mtflush_service_io(mtflush_io, this_thread_data);
+		mtflush_service_io(mtflush_io, this_thread_data, node);
 
 
 		if (this_thread_data->wt_status == WTHR_KILL_IT) {
