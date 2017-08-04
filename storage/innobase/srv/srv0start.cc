@@ -2707,12 +2707,21 @@ files_checked:
 
 #ifdef HAVE_LIBNUMA
 			if (srv_numa_enable) {
+				ulint srv_mtflush_threads_old_val = srv_mtflush_threads;
 				ulint remainder = srv_mtflush_threads % srv_buf_pool_instances;
+
 				if (remainder != 0) {
-					srv_mtflush_threads + srv_buf_pool_instances - remainder;
+					srv_mtflush_threads = srv_mtflush_threads + srv_buf_pool_instances - remainder;
+				}
+
+				if (srv_mtflush_threads != srv_mtflush_threads_old_val) {
+					ib::info()
+						<< "Adjusting innodb_mtflush_threads"
+						" from " << srv_mtflush_threads_old_val << " to "
+						<< srv_mtflush_threads << " since numa is enabled.";
 				}
 			}
-#endif
+#endif // HAVE_LIBNUMA
 			/* Start multi-threaded flush threads */
 			mtflush_ctx = buf_mtflu_handler_init(
 				srv_mtflush_threads,

@@ -275,7 +275,7 @@ mtflush_service_io(
 	thread_sync_t*	mtflush_io,	/*!< inout: multi-threaded flush
 					syncronization data */
 	thread_data_t*  thread_data,    /* Thread status data */
-	ulint			node_id;
+	ulint			node_id)
 {
 	wrk_t		*work_item = NULL;
 	ulint		n_flushed=0;
