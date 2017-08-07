@@ -106,6 +106,19 @@ struct set_numa_t
 			}
 		}
 
+#ifndef DBUG_OFF
+		if (fake_numa) {
+
+			if (set_mempolicy(MPOL_PREFERRED,
+					  numa_mems_allowed->maskp,
+					  numa_mems_allowed->size) != 0) {
+
+				DBUG_LOG( "NUMA Enable", "Failed to set NUMA Policy"
+				" to MPOL_PREFERRED"
+				" (error: " << strerror(errno) << ").");
+			}
+		}
+#else
 		if (srv_numa_enable) {
 
 			if (set_mempolicy(MPOL_BIND,
@@ -117,6 +130,8 @@ struct set_numa_t
 					<< strerror(errno);
 			}
 		}
+#endif // DBUG_OFF
+
 	}
 
 	~set_numa_t()
@@ -1557,9 +1572,29 @@ buf_chunk_init(
 				" (error: " << strerror(errno) << ").";
 		}
 	}
+
+
+#ifndef DBUG_OFF
+	if (fake_numa) {
+		struct bitmask* node_mask = mysql_numa_bitmask_alloc(SRV_MAX_NUM_NUMA_NODES);
+		mysql_numa_bitmask_setbit(node_mask, srv_allowed_nodes[instance_no]);
+
+		ulint	mbind_val = mbind(chunk->mem, chunk->mem_size(),
+				   MPOL_PREFERRED,
+				   node_mask->maskp,
+				   node_mask->size,
+				   MPOL_MF_MOVE);
+		if (mbind_val != 0) {
+			DBUG_LOG( "NUMA Enable", "Failed to set NUMA Policy"
+				" buffer pool page frames to MPOL_PREFERRED"
+				" (error: " << strerror(errno) << ").");
+		}
+	}
+#else
 	if (srv_numa_enable) {
 		struct bitmask* node_mask = mysql_numa_bitmask_alloc(SRV_MAX_NUM_NUMA_NODES);
 		mysql_numa_bitmask_setbit(node_mask, srv_allowed_nodes[instance_no]);
+
 		ulint	mbind_val = mbind(chunk->mem, chunk->mem_size(),
 				   MPOL_BIND,
 				   node_mask->maskp,
@@ -1571,6 +1606,7 @@ buf_chunk_init(
 				" (error: " << strerror(errno) << ").";
 		}
 	}
+#endif // DBUG_OFF
 #endif /* HAVE_LIBNUMA */
 
 

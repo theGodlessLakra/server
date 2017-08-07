@@ -457,6 +457,7 @@ handlerton *partition_hton;
 
 my_bool read_only= 0, opt_readonly= 0;
 my_bool srv_numa_enable= 0;
+my_bool fake_numa= 0;
 unsigned long int srv_no_of_allowed_nodes= 0;
 unsigned long int srv_allowed_nodes[SRV_MAX_NUM_NUMA_NODES];
 unsigned long int srv_size_of_numa_node[SRV_MAX_NUM_NUMA_NODES];
