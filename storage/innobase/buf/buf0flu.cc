@@ -2845,6 +2845,9 @@ pc_flush_slot(void)
 	int	lru_pass = 0;
 	int	list_pass = 0;
 
+	char 	thread_name[20];
+	pthread_getname_np((pthread_t) os_thread_get_curr_id(), thread_name, 20);
+
 	mutex_enter(&page_cleaner->mutex);
 
 	if (page_cleaner->n_slots_requested > 0) {
@@ -2862,7 +2865,10 @@ pc_flush_slot(void)
 				mutex_exit(&page_cleaner->mutex);
 				return 0;
 			}
-		} else {
+		}
+		else
+#endif // HAVE_LIBNUMA
+		{
 			for (i = 0; i < page_cleaner->n_slots; i++) {
 				slot = &page_cleaner->slots[i];
 
@@ -2871,15 +2877,8 @@ pc_flush_slot(void)
 				}
 			}
 		}
-#else
-		for (i = 0; i < page_cleaner->n_slots; i++) {
-			slot = &page_cleaner->slots[i];
 
-			if (slot->state == PAGE_CLEANER_STATE_REQUESTED) {
-				break;
-			}
-		}
-#endif // HAVE_LIBNUMA
+		ib::info() << thread_name << " flushing buf pool in node " << i;
 
 		/* slot should be found because
 		page_cleaner->n_slots_requested > 0 */
@@ -3154,6 +3153,7 @@ DECLARE_THREAD(buf_flush_page_cleaner_coordinator)(
 			/*!< in: a dummy parameter required by
 			os_thread_create */
 {
+	pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Coordinator THD");
 	my_thread_init();
 #ifdef UNIV_PFS_THREAD
 	pfs_register_thread(page_cleaner_thread_key);
@@ -3541,6 +3541,13 @@ DECLARE_THREAD(buf_flush_page_cleaner_worker)(
 	if (srv_numa_enable) {
 		node = srv_allowed_nodes[node_no++];
 		mysql_bind_thread_to_node(node);
+		if (node == 0) {
+			pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Cleaner THD 0");
+		} else if (node == 1) {
+			pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Cleaner THD 1");
+		} else {
+			pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Cleaner THD 2");
+		}
 	}
 #endif // HAVE_LIBNUMA
 

@@ -5442,6 +5442,32 @@ fil_aio_wait(
 		return;
 	}
 
+#ifdef HAVE_LIBNUMA
+	if (srv_numa_enable && (mysql_node_of_cur_thread() != -1)) {
+		ulint 	node_of_pool;
+
+		char 	thread_name[20];
+		pthread_getname_np((pthread_t) os_thread_get_curr_id(), thread_name, 20);
+
+		buf_page_t* bpage = static_cast<buf_page_t*>(message);
+		buf_pool_t*	buf_pool = buf_pool_from_bpage(bpage);
+
+		for (int i = 0; i < srv_buf_pool_instances; i++) {
+			if (buf_pool == srv_buf_pool_on_node(i)) {
+				node_of_pool = i;
+				break;
+			}
+		}
+
+		if (node_of_pool != mysql_node_of_cur_thread()) {
+/*			ib::info() << thread_name << " returning from fil_aio_wait()";
+			return;*/
+		}
+
+		ib::info() << thread_name << " accessing buf_page on node : " << node_of_pool << " in fil_aio_wait()";
+	}
+#endif // HAVE_LIBNUMA
+
 	srv_set_io_thread_op_info(segment, "complete io for fil node");
 
 	mutex_enter(&fil_system->mutex);

@@ -88,6 +88,9 @@ Created 10/21/1995 Heikki Tuuri
 #include <winioctl.h>
 #endif
 
+#include "mysql/service_numa.h"
+#include "srv0srv.h"
+
 /** Insert buffer segment id */
 static const ulint IO_IBUF_SEGMENT = 0;
 
@@ -7132,6 +7135,9 @@ os_aio_simulated_handler(
 	void**		m2,
 	IORequest*	type)
 {
+	char 	thread_name[20];
+	pthread_getname_np((pthread_t) os_thread_get_curr_id(), thread_name, 20);
+
 	Slot*		slot;
 	AIO*		array;
 	ulint		segment;
@@ -7164,6 +7170,34 @@ os_aio_simulated_handler(
 		slot = handler.check_completed(&n_reserved);
 
 		if (slot != NULL) {
+
+#ifdef HAVE_LIBNUMA
+			if (srv_numa_enable && (mysql_node_of_cur_thread() != -1)) {
+				ulint 	node_of_pool = 20;
+
+				*m2 = slot->m2;
+
+				buf_page_t* bpage = static_cast<buf_page_t*>(*m2);
+				buf_pool_t* buf_pool = buf_pool_from_bpage(bpage);
+
+				for (int i = 0; i < srv_buf_pool_instances; i++) {
+					if (buf_pool == srv_buf_pool_on_node(i)) {
+						node_of_pool = i;
+						break;
+					}
+				}
+
+				if (node_of_pool != mysql_node_of_cur_thread()) {
+					os_event_reset(event);
+					array->release(slot);
+					array->release();
+					ib::info() << thread_name << " returning from os_aio_simulated_handler()";
+					return(DB_SUCCESS);
+				}
+
+				ib::info() << thread_name << " accessing buf_page on node : " << node_of_pool << " in os_aio_simulated_handler()";
+			}
+#endif // HAVE_LIBNUMA
 
 			break;
 

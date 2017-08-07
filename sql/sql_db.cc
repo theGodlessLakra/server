@@ -1382,6 +1382,9 @@ static void mysql_change_db_impl(THD *thd,
       }
       mysql_bind_thread_to_node(node);
       thd->numa_node_id = node;
+
+      printf("Thread : %lu accessing %s on node : %lu", pthread_self(), new_db_name->str, node);
+      puts(" ");
     }
 #endif // HAVE_LIBNUMA
   }

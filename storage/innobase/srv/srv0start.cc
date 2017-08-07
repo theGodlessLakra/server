@@ -334,6 +334,13 @@ DECLARE_THREAD(io_handler_thread)(
 			if (srv_numa_enable) {
 				node = srv_allowed_nodes[read_node++/2];
 				mysql_bind_thread_to_node(node);
+				if (node == 0) {
+					pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Read THD 0");
+				} else if (node == 1) {
+					pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Read THD 1");
+				} else {
+					pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Read THD 2");
+				}
 			}
 #endif // HAVE_LIBNUMA
 
@@ -345,6 +352,13 @@ DECLARE_THREAD(io_handler_thread)(
 			if (srv_numa_enable) {
 				node = srv_allowed_nodes[write_node++/2];
 				mysql_bind_thread_to_node(node);
+				if (node == 0) {
+					pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Write THD 0");
+				} else if (node == 1) {
+					pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Write THD 1");
+				} else {
+					pthread_setname_np((pthread_t) os_thread_get_curr_id(), "Write THD 2");
+				}
 			}
 #endif // HAVE_LIBNUMA
 

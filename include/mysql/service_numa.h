@@ -31,6 +31,7 @@ extern "C" {
 
 #define SRV_MAX_NUM_NUMA_NODES 16
 
+extern my_bool srv_numa_enable;
 extern unsigned long int srv_no_of_allowed_nodes;
 extern unsigned long int srv_allowed_nodes[SRV_MAX_NUM_NUMA_NODES];
 extern unsigned long int srv_size_of_numa_node[SRV_MAX_NUM_NUMA_NODES];
