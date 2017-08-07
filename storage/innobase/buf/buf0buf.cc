@@ -596,6 +596,9 @@ buf_block_alloc(
 	ulint		index;
 	static ulint	buf_pool_index;
 
+	char 	thread_name[20];
+	pthread_getname_np((pthread_t) os_thread_get_curr_id(), thread_name, 20);
+
 	if (buf_pool == NULL) {
 
 #ifdef HAVE_LIBNUMA
@@ -603,11 +606,13 @@ buf_block_alloc(
 
 		if (srv_numa_enable && node != -1) {
 			buf_pool = srv_buf_pool_on_node(node);
+			ib::info() << thread_name << " allocating block from node " << node << " in buf_block_alloc()";
 		} else {
 			/* We are allocating memory from any buffer pool, ensure
 			we spread the grace on all buffer pool instances. */
 			index = buf_pool_index++ % srv_buf_pool_instances;
 			buf_pool = buf_pool_from_array(index);
+			ib::info() << thread_name << " allocating block from node " << index << " in buf_block_alloc()";
 		}
 #else
 		/* We are allocating memory from any buffer pool, ensure
