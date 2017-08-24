@@ -113,6 +113,8 @@
 
 #include <my_systemd.h>
 
+#include "mysql/service_numa.h"
+
 #define mysqld_charset &my_charset_latin1
 
 /* We have HAVE_valgrind below as this speeds up the shutdown of MySQL */

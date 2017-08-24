@@ -1,1 +1,18 @@
-SET SESSION debug_dbug="+d,fake_numa";
+SELECT @@GLOBAL.fake_numa;
+@@GLOBAL.fake_numa
+1
+SELECT @@SESSION.fake_numa;
+ERROR HY000: Variable 'fake_numa' is a GLOBAL variable
+SELECT IF(@@global.fake_numa, "ON", "OFF") = VARIABLE_VALUE 
+FROM INFORMATION_SCHEMA.GLOBAL_VARIABLES 
+WHERE VARIABLE_NAME='fake_numa';
+IF(@@global.fake_numa, "ON", "OFF") = VARIABLE_VALUE
+1
+SELECT IF(@@fake_numa, "ON", "OFF") = VARIABLE_VALUE 
+FROM INFORMATION_SCHEMA.SESSION_VARIABLES 
+WHERE VARIABLE_NAME='fake_numa';
+IF(@@fake_numa, "ON", "OFF") = VARIABLE_VALUE
+1
+SELECT @@fake_numa = @@global.fake_numa;
+@@fake_numa = @@global.fake_numa
+1
