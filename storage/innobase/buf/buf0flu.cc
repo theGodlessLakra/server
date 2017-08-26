@@ -3498,11 +3498,25 @@ DECLARE_THREAD(buf_flush_page_cleaner_worker)(
 			/*!< in: a dummy parameter required by
 			os_thread_create */
 {
+	static ulint	node_no = 0;
+	int		node = -1;
 	my_thread_init();
 
 	mutex_enter(&page_cleaner->mutex);
 	page_cleaner->n_workers++;
 	mutex_exit(&page_cleaner->mutex);
+
+#ifdef HAVE_LIBNUMA
+#ifndef DBUG_OFF
+	if (fake_numa || mysql_numa_enable)
+#else
+	if (mysql_numa_enable)
+#endif // DBUG_OFF
+	{
+		node = allowed_numa_nodes[node_no++];
+		mysql_bind_thread_to_node(node);
+	}
+#endif // HAVE_LIBNUMA
 
 #ifdef UNIV_LINUX
 	/* linux might be able to set different setting for each thread

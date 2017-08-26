@@ -306,6 +306,9 @@ DECLARE_THREAD(io_handler_thread)(
 			the aio array */
 {
 	ulint	segment;
+	ulint	node;
+	static ulint	read_node = 0;
+	static ulint	write_node = 0;
 
 	segment = *((ulint*) arg);
 
@@ -328,11 +331,33 @@ DECLARE_THREAD(io_handler_thread)(
 	} else if (segment >= start
 		   && segment < (start + srv_n_read_io_threads)) {
 			pfs_register_thread(io_read_thread_key);
+#ifdef HAVE_LIBNUMA
+#ifndef DBUG_OFF
+			if (fake_numa || mysql_numa_enable)
+#else
+			if (mysql_numa_enable)
+#endif // DBUG_OFF
+			{
+				node = allowed_numa_nodes[read_node++/2];
+				mysql_bind_thread_to_node(node);
+			}
+#endif // HAVE_LIBNUMA
 
 	} else if (segment >= (start + srv_n_read_io_threads)
 		   && segment < (start + srv_n_read_io_threads
 				 + srv_n_write_io_threads)) {
 		pfs_register_thread(io_write_thread_key);
+#ifdef HAVE_LIBNUMA
+#ifndef DBUG_OFF
+			if (fake_numa || mysql_numa_enable)
+#else
+			if (mysql_numa_enable)
+#endif // DBUG_OFF
+			{
+				node = allowed_numa_nodes[write_node++/2];
+				mysql_bind_thread_to_node(node);
+			}
+#endif // HAVE_LIBNUMA
 
 	} else {
 		pfs_register_thread(io_handler_thread_key);
