@@ -611,10 +611,24 @@ buf_block_alloc(
 	static ulint	buf_pool_index;
 
 	if (buf_pool == NULL) {
-		/* We are allocating memory from any buffer pool, ensure
-		we spread the grace on all buffer pool instances. */
-		index = buf_pool_index++ % srv_buf_pool_instances;
-		buf_pool = buf_pool_from_array(index);
+#ifdef HAVE_LIBNUMA
+		int node = mysql_node_of_cur_thread();
+
+#ifndef DBUG_OFF
+		if ((fake_numa || mysql_numa_enable)  && node != -1)
+#else
+		if (mysql_numa_enable && node != -1)
+#endif // DBUG_OFF
+	    {
+			buf_pool = srv_buf_pool_on_node(node);
+		} else
+#endif // HAVE_LIBNUMA
+		{
+			/* We are allocating memory from any buffer pool, ensure
+			we spread the grace on all buffer pool instances. */
+			index = buf_pool_index++ % srv_buf_pool_instances;
+			buf_pool = buf_pool_from_array(index);
+		}
 	}
 
 	block = buf_LRU_get_free_block(buf_pool);
