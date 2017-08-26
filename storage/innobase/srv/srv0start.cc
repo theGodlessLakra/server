@@ -109,6 +109,7 @@ Created 2/16/1996 Heikki Tuuri
 #include "ut0crc32.h"
 #include "btr0scrub.h"
 #include "ut0new.h"
+#include "mysql/service_numa.h"
 
 #ifdef HAVE_LZO1X
 #include <lzo/lzo1x.h>
@@ -1702,6 +1703,17 @@ innobase_start_or_create_for_mysql()
 
 		srv_buf_pool_instances = 1;
 	}
+
+#ifdef HAVE_LIBNUMA
+	if (srv_numa_interleave && mysql_numa_enable) {
+		mysql_numa_enable = false;
+	}
+#ifndef DBUG_OFF
+	if (srv_numa_interleave && fake_numa) {
+		fake_numa = false;
+	}
+#endif // DBUG_OFF
+#endif // HAVE_LIBNUMA
 
 	if (srv_buf_pool_chunk_unit * srv_buf_pool_instances
 	    > srv_buf_pool_size) {
