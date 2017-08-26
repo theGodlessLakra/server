@@ -1769,6 +1769,20 @@ innobase_start_or_create_for_mysql()
 
 	srv_buf_pool_size = buf_pool_size_align(srv_buf_pool_size);
 
+#ifdef HAVE_LIBNUMA
+#ifndef DBUG_OFF
+    if (fake_numa || mysql_numa_enable)
+#else
+    if (mysql_numa_enable)
+#endif // DBUG_OFF
+	{
+		for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+			srv_size_of_buf_pool_in_node[i] = ((double) size_of_numa_node[i] / total_numa_nodes_size) * srv_buf_pool_size;
+			srv_size_of_buf_pool_in_node[i] = buf_pool_size_align(srv_size_of_buf_pool_in_node[i]);
+		}
+	}
+#endif // HAVE_LIBNUMA
+
 	if (srv_n_page_cleaners > srv_buf_pool_instances) {
 		/* limit of page_cleaner parallelizability
 		is number of buffer pool instances. */

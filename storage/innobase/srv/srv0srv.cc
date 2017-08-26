@@ -78,6 +78,7 @@ Created 10/8/1995 Heikki Tuuri
 #include "fil0crypt.h"
 #include "fil0pagecompress.h"
 #include "btr0scrub.h"
+#include "mysql/service_numa.h"
 #ifdef WITH_WSREP
 extern int wsrep_debug;
 extern int wsrep_trx_is_aborting(void *thd_ptr);
@@ -178,6 +179,7 @@ use simulated aio we build below with threads.
 Currently we support native aio on windows and linux */
 my_bool	srv_use_native_aio;
 my_bool	srv_numa_interleave;
+ulint	srv_size_of_buf_pool_in_node[MYSQL_MAX_NUM_NUMA_NODES];
 /** innodb_use_trim; whether to use fallocate(PUNCH_HOLE) with
 page_compression */
 my_bool	srv_use_trim;
